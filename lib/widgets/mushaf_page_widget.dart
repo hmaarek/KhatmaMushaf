@@ -481,6 +481,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     for (int i = 0; i < line.words.length; i++) {
       final word = line.words[i];
       final isSelected = selectedVerse == word.verseKey;
+      final isKhatmaMark =
+          widget.controller.isKhatmaCurrentVerse(word.verseKey);
       final isBookmarkedAyah =
           widget.controller.isAyahBookmarked(word.verseKey);
 
@@ -494,6 +496,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       Color? bgColor;
       if (isSelected) {
         bgColor = theme.ayahHighlightFill;
+      } else if (isKhatmaMark) {
+        bgColor = const Color(0x3D2B8A62);
       } else if (isBookmarkedAyah) {
         bgColor = theme.ayahHighlightFill.withValues(alpha: 0.14);
       }
@@ -507,7 +511,11 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             fontSize: baseFontSize,
             height: 1.05,
             wordSpacing: -2.5,
-            color: isSelected ? theme.ornamentPrimary : theme.glyphColor,
+            color: isSelected
+                ? theme.ornamentPrimary
+                : isKhatmaMark
+                    ? const Color(0xFF1F7A53)
+                    : theme.glyphColor,
             backgroundColor: bgColor,
           ),
         ),

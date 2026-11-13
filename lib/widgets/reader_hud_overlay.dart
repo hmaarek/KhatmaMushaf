@@ -9,6 +9,7 @@ class ReaderHudOverlay extends StatefulWidget {
   final VoidCallback onOpenIndex;
   final VoidCallback onOpenSearch;
   final VoidCallback onOpenBookmarks;
+  final VoidCallback onOpenKhatma;
   final VoidCallback onOpenSettings;
 
   const ReaderHudOverlay({
@@ -17,6 +18,7 @@ class ReaderHudOverlay extends StatefulWidget {
     required this.onOpenIndex,
     required this.onOpenSearch,
     required this.onOpenBookmarks,
+    required this.onOpenKhatma,
     required this.onOpenSettings,
   });
 
@@ -124,6 +126,15 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                           tooltip: 'بحث في القرآن (Search)',
                           theme: theme,
                           onTap: widget.onOpenSearch,
+                        ),
+                        const SizedBox(width: 5),
+                        // Khatma tracker button
+                        _HudIconButton(
+                          icon: Icons.workspace_premium_rounded,
+                          tooltip: 'متابعة الختمة (Khatma)',
+                          label: 'الختمة',
+                          theme: theme,
+                          onTap: widget.onOpenKhatma,
                         ),
                         const SizedBox(width: 5),
                         // Bookmarks list button

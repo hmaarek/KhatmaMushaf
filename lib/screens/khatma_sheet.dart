@@ -1,0 +1,1315 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../models/khatma_models.dart';
+import '../state/mushaf_controller.dart';
+import '../theme/mushaf_theme.dart';
+import '../utils/arabic_utils.dart';
+
+/// Opens the celebratory Full Khatma Report modal dialog/sheet.
+Future<void> showKhatmaReportModal(
+  BuildContext context, {
+  required MushafController controller,
+  required KhatmaRecord khatma,
+  bool isJustCompletedCelebration = false,
+}) async {
+  final report = controller.generateKhatmaReport(khatma);
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _KhatmaReportSheet(
+      controller: controller,
+      khatma: khatma,
+      report: report,
+      isCelebration: isJustCompletedCelebration,
+    ),
+  );
+}
+
+class KhatmaSheet extends StatefulWidget {
+  final MushafController controller;
+
+  const KhatmaSheet({
+    super.key,
+    required this.controller,
+  });
+
+  @override
+  State<KhatmaSheet> createState() => _KhatmaSheetState();
+}
+
+class _KhatmaSheetState extends State<KhatmaSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final theme = widget.controller.theme;
+        final activeKhatma = widget.controller.activeKhatma;
+        final completedList = widget.controller.completedKhatmas;
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.88,
+            decoration: BoxDecoration(
+              color: theme.pageBackground,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(color: theme.pageOuterBorder, width: 1.4),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.secondaryTextColor.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.workspace_premium_rounded,
+                            color: theme.ornamentPrimary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'متابعة الختمة القرآنية',
+                            style: TextStyle(
+                              color: theme.glyphColor,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: theme.glyphColor,
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: theme.ornamentFill,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.pageInnerBorder),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    dividerColor: Colors.transparent,
+                    indicator: BoxDecoration(
+                      color: theme.ornamentPrimary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    labelColor: Colors.white,
+                    unselectedLabelColor: theme.glyphColor,
+                    labelStyle: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    tabs: [
+                      const Tab(text: 'الختمة الحالية'),
+                      Tab(
+                        text:
+                            'الختمات المكتملة (${ArabicUtils.toArabicDigits(completedList.length)})',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      activeKhatma == null
+                          ? _buildNoActiveKhatmaView(context, theme)
+                          : _buildActiveKhatmaView(
+                              context,
+                              activeKhatma,
+                              theme,
+                            ),
+                      _buildCompletedKhatmasTab(context, completedList, theme),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNoActiveKhatmaView(BuildContext context, MushafThemeData theme) {
+    final nextSerial = widget.controller.khatmas.isEmpty
+        ? 1
+        : widget.controller.khatmas
+                  .map((k) => k.serialNumber)
+                  .reduce((a, b) => a > b ? a : b) +
+              1;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Container(
+          padding: const EdgeInsets.all(22.0),
+          decoration: BoxDecoration(
+            color: theme.ornamentFill,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: theme.pageOuterBorder, width: 1.4),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: theme.ornamentPrimary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.auto_stories_rounded,
+                  size: 34,
+                  color: theme.ornamentPrimary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'ابدأ الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                style: TextStyle(
+                  color: theme.glyphColor,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'سيتم تسجيل تاريخ ووقت البدء تلقائياً ومنح الختمة رقماً تسلسلياً.\nأثناء القراءة، اضغط مطولاً على أي آية وصلت إليها لتحديدها كعلامة الختمة الحالية، وعند الوصول لآخر آية في المصحف ستحصل على تقرير تفصيلي كامل لختمتك.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: theme.secondaryTextColor,
+                  fontSize: 13.5,
+                  height: 1.55,
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.ornamentPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final created = await widget.controller.startNewKhatma();
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: theme.hudSurface,
+                          content: Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: Text(
+                              'بدأت ${created.title} على بركة الله!',
+                              style: TextStyle(color: theme.hudText),
+                            ),
+                          ),
+                        ),
+                      );
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                  label: Text(
+                    'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)} الآن',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveKhatmaView(
+    BuildContext context,
+    KhatmaRecord khatma,
+    MushafThemeData theme,
+  ) {
+    final mark = khatma.currentMark;
+    final prevMark = khatma.previousMark;
+    final percent = (khatma.progressRatio * 100).clamp(0.0, 100.0);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
+      children: [
+        // 1. Active Khatma Summary Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.ornamentFill,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.ornamentPrimary, width: 1.4),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.ornamentPrimary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '#${ArabicUtils.toArabicDigits(khatma.serialNumber)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        khatma.title,
+                        style: TextStyle(
+                          color: theme.glyphColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '${ArabicUtils.toArabicDigits(percent.toStringAsFixed(1))}٪',
+                    style: TextStyle(
+                      color: theme.ornamentPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'تاريخ ووقت البدء: ${_formatDateTimeArabic(khatma.startedAt)}',
+                style: TextStyle(
+                  color: theme.secondaryTextColor,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: khatma.progressRatio.clamp(0.02, 1.0),
+                  minHeight: 9,
+                  backgroundColor: theme.pageBackground,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(theme.ornamentPrimary),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _MiniStatBox(
+                    label: 'الآيات المقروءة',
+                    value:
+                        '${ArabicUtils.toArabicDigits(khatma.reachedAyahsCount)} / ٦٢٣٦',
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _MiniStatBox(
+                    label: 'الصفحة الحالية',
+                    value:
+                        '${ArabicUtils.toArabicDigits(khatma.reachedPageNumber)} / ٦٠٤',
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _MiniStatBox(
+                    label: 'الجزء الحالي',
+                    value:
+                        '${ArabicUtils.toArabicDigits(khatma.reachedJuzNumber)} / ٣٠',
+                    theme: theme,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 2. Current Khatma Mark & Rollback Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.pageBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.pageInnerBorder, width: 1.2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.flag_rounded,
+                    color: theme.ornamentPrimary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'الموضع الحالي في الختمة',
+                    style: TextStyle(
+                      color: theme.glyphColor,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (mark == null)
+                Text(
+                  'لم يتم وضع علامة بعد (البداية: سورة الفاتحة ص ١).\nاضغط مطولاً على أي آية أثناء القراءة واختر "تحديد كعلامة الختمة".',
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                )
+              else ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.ornamentFill,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.pageInnerBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'سورة ${mark.surahNameArabic} • الآية ${ArabicUtils.toArabicDigits(mark.ayahNumber)}',
+                            style: TextStyle(
+                              color: theme.glyphColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'ص ${ArabicUtils.toArabicDigits(mark.pageNumber)} • جزء ${ArabicUtils.toArabicDigits(mark.juzNumber)}',
+                            style: TextStyle(
+                              color: theme.ornamentPrimary,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'وقت التسجيل: ${_formatDateTimeArabic(mark.recordedAt)}',
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (prevMark != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'الموضع السابق المحفوظ: سورة ${prevMark.surahNameArabic} آية ${ArabicUtils.toArabicDigits(prevMark.ayahNumber)} (ص ${ArabicUtils.toArabicDigits(prevMark.pageNumber)})',
+                    style: TextStyle(
+                      color: theme.secondaryTextColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.ornamentPrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        widget.controller.goToPage(
+                          mark?.pageNumber ?? 1,
+                          highlightVerseKey: mark?.verseKey ?? '1:1',
+                        );
+                      },
+                      icon: const Icon(Icons.menu_book_rounded, size: 18),
+                      label: Text(
+                        mark == null
+                            ? 'الذهاب لبداية الختمة'
+                            : 'مواصلة القراءة من العلامة',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (mark != null) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.bookmarkRibbon,
+                        side: BorderSide(color: theme.bookmarkRibbon),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () async {
+                        await widget.controller
+                            .deleteCurrentKhatmaMark(khatma.id);
+                      },
+                      icon: const Icon(Icons.undo_rounded, size: 18),
+                      label: const Text(
+                        'حذف العلامة',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Option to preview live report or complete Khatma
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => showKhatmaReportModal(
+                        context,
+                        controller: widget.controller,
+                        khatma: khatma,
+                      ),
+                      icon: Icon(
+                        Icons.analytics_outlined,
+                        size: 18,
+                        color: theme.ornamentPrimary,
+                      ),
+                      label: Text(
+                        'إحصائيات الختمة حتى الآن',
+                        style: TextStyle(
+                          color: theme.ornamentPrimary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        final completed =
+                            await widget.controller.completeActiveKhatma();
+                        if (!context.mounted || completed == null) return;
+                        await showKhatmaReportModal(
+                          context,
+                          controller: widget.controller,
+                          khatma: completed,
+                          isJustCompletedCelebration: true,
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 18,
+                        color: Color(0xFF2B8A62),
+                      ),
+                      label: const Text(
+                        'إتمام الختمة الآن',
+                        style: TextStyle(
+                          color: Color(0xFF2B8A62),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+        // 3. Progress History Log
+        Text(
+          'سجل علامات التقدم (${ArabicUtils.toArabicDigits(khatma.logs.length)})',
+          style: TextStyle(
+            color: theme.glyphColor,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (khatma.logs.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.ornamentFill,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'سيظهر هنا السجل الزمني لكل آية تحددها أثناء تقدمك في الختمة.',
+              style: TextStyle(
+                color: theme.secondaryTextColor,
+                fontSize: 12.5,
+              ),
+            ),
+          )
+        else
+          ...khatma.logs.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final log = entry.value;
+            final isLatest = idx == 0;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isLatest
+                    ? theme.ornamentPrimary.withValues(alpha: 0.12)
+                    : theme.ornamentFill,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      isLatest ? theme.ornamentPrimary : theme.pageInnerBorder,
+                ),
+              ),
+              child: ListTile(
+                dense: true,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.controller.goToPage(
+                    log.pageNumber,
+                    highlightVerseKey: log.verseKey,
+                  );
+                },
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: isLatest
+                      ? theme.ornamentPrimary
+                      : theme.pageBackground,
+                  child: Icon(
+                    isLatest ? Icons.flag_rounded : Icons.history_rounded,
+                    size: 16,
+                    color: isLatest ? Colors.white : theme.ornamentPrimary,
+                  ),
+                ),
+                title: Text(
+                  'سورة ${log.surahNameArabic} • الآية ${ArabicUtils.toArabicDigits(log.ayahNumber)} (ص ${ArabicUtils.toArabicDigits(log.pageNumber)})',
+                  style: TextStyle(
+                    color: theme.glyphColor,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  _formatDateTimeArabic(log.recordedAt),
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontSize: 11.5,
+                  ),
+                ),
+                trailing: isLatest
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.ornamentPrimary,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'الحالية',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    : null,
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildCompletedKhatmasTab(
+    BuildContext context,
+    List<KhatmaRecord> completedList,
+    MushafThemeData theme,
+  ) {
+    if (completedList.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            'لا توجد ختمات مكتملة بعد.\nعند إتمام الختمة ستظهر هنا مع التقرير التفصيلي الكامل لكل ختمة.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: theme.secondaryTextColor,
+              fontSize: 14,
+              height: 1.6,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+      itemCount: completedList.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final khatma = completedList[index];
+        final report = widget.controller.generateKhatmaReport(khatma);
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.ornamentFill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.pageInnerBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFF2B8A62),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'الختمة رقم ${ArabicUtils.toArabicDigits(khatma.serialNumber)}',
+                        style: TextStyle(
+                          color: theme.glyphColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2B8A62).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'المدة: ${_formatDaysLabel(report.durationInDays, report.calendarDaysSpan)}',
+                      style: const TextStyle(
+                        color: Color(0xFF2B8A62),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'البدء: ${_formatDateTimeArabic(report.startedAt)}\nالإتمام: ${_formatDateTimeArabic(report.completedAt)}',
+                style: TextStyle(
+                  color: theme.secondaryTextColor,
+                  fontSize: 12,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.ornamentPrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () => showKhatmaReportModal(
+                        context,
+                        controller: widget.controller,
+                        khatma: khatma,
+                      ),
+                      icon: const Icon(Icons.assessment_rounded, size: 18),
+                      label: const Text(
+                        'عرض التقرير الكامل',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'التراجع عن آخر علامة وإعادة فتح الختمة',
+                    icon: Icon(
+                      Icons.undo_rounded,
+                      color: theme.secondaryTextColor,
+                    ),
+                    onPressed: () =>
+                        widget.controller.deleteCurrentKhatmaMark(khatma.id),
+                  ),
+                  IconButton(
+                    tooltip: 'حذف سجل الختمة',
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: theme.bookmarkRibbon,
+                    ),
+                    onPressed: () => widget.controller.deleteKhatma(khatma.id),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _KhatmaReportSheet extends StatelessWidget {
+  final MushafController controller;
+  final KhatmaRecord khatma;
+  final KhatmaReport report;
+  final bool isCelebration;
+
+  const _KhatmaReportSheet({
+    required this.controller,
+    required this.khatma,
+    required this.report,
+    required this.isCelebration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = controller.theme;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+        ),
+        decoration: BoxDecoration(
+          color: theme.pageBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: theme.ornamentPrimary, width: 1.8),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.secondaryTextColor.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Celebration Header
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: theme.ornamentFill,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.ornamentPrimary,
+                            width: 1.4,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              isCelebration || khatma.isCompleted
+                                  ? Icons.workspace_premium_rounded
+                                  : Icons.insights_rounded,
+                              size: 42,
+                              color: theme.ornamentPrimary,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              khatma.isCompleted
+                                  ? 'تقبّل الله طاعتكم! تم إتمام الختمة المباركة'
+                                  : 'تقرير تقدم الختمة',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: theme.ornamentPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'تقرير الختمة رقم ${ArabicUtils.toArabicDigits(report.serialNumber)}',
+                              style: TextStyle(
+                                color: theme.glyphColor,
+                                fontSize: 21,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Dates & Duration Grid
+                      _ReportDetailRow(
+                        icon: Icons.tag_rounded,
+                        label: 'رقم الختمة التسلسلي',
+                        value:
+                            'الختمة رقم ${ArabicUtils.toArabicDigits(report.serialNumber)}',
+                        theme: theme,
+                      ),
+                      _ReportDetailRow(
+                        icon: Icons.timer_outlined,
+                        label: 'المدة المستغرقة بالأيام',
+                        value: _formatDetailedDuration(
+                          report.durationInDays,
+                          report.exactDuration,
+                          report.calendarDaysSpan,
+                        ),
+                        theme: theme,
+                      ),
+                      _ReportDetailRow(
+                        icon: Icons.play_circle_outline_rounded,
+                        label: 'تاريخ ووقت البدء',
+                        value: _formatDateTimeArabic(report.startedAt),
+                        theme: theme,
+                      ),
+                      _ReportDetailRow(
+                        icon: Icons.check_circle_outline_rounded,
+                        label: khatma.isCompleted
+                            ? 'تاريخ ووقت الإتمام'
+                            : 'آخر تحديث مسجل',
+                        value: _formatDateTimeArabic(report.completedAt),
+                        theme: theme,
+                      ),
+
+                      const SizedBox(height: 14),
+                      Text(
+                        'المعدلات اليومية للختمة',
+                        style: TextStyle(
+                          color: theme.glyphColor,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _MiniStatBox(
+                            label: 'معدل الآيات / يوم',
+                            value: ArabicUtils.toArabicDigits(
+                              report.averageAyahsPerDay.toStringAsFixed(1),
+                            ),
+                            theme: theme,
+                          ),
+                          const SizedBox(width: 8),
+                          _MiniStatBox(
+                            label: 'معدل الصفحات / يوم',
+                            value: ArabicUtils.toArabicDigits(
+                              report.averagePagesPerDay.toStringAsFixed(1),
+                            ),
+                            theme: theme,
+                          ),
+                          const SizedBox(width: 8),
+                          _MiniStatBox(
+                            label: 'معدل الأجزاء / يوم',
+                            value: ArabicUtils.toArabicDigits(
+                              report.averageJuzPerDay.toStringAsFixed(2),
+                            ),
+                            theme: theme,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      // Usual time of day where most readings are done
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: theme.ornamentFill,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: theme.pageInnerBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.schedule_rounded,
+                                  color: theme.ornamentPrimary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'الوقت المعتاد للقراءة في اليوم',
+                                  style: TextStyle(
+                                    color: theme.glyphColor,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${report.usualReadingSlot.arabicName} (${report.usualReadingSlot.rangeLabel})',
+                              style: TextStyle(
+                                color: theme.ornamentPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'ساعة الذروة الأكثر قراءة: حوالي ${_formatHourArabic(report.peakReadingHour)}',
+                              style: TextStyle(
+                                color: theme.secondaryTextColor,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: theme.glyphColor,
+                                side: BorderSide(color: theme.ornamentPrimary),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              onPressed: () async {
+                                final textSummary = _buildPlainTextReport(
+                                  report,
+                                );
+                                await Clipboard.setData(
+                                  ClipboardData(text: textSummary),
+                                );
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      behavior: SnackBarBehavior.floating,
+                                      backgroundColor: theme.hudSurface,
+                                      content: Directionality(
+                                        textDirection: TextDirection.rtl,
+                                        child: Text(
+                                          'تم نسخ تقرير الختمة إلى الحافظة',
+                                          style:
+                                              TextStyle(color: theme.hudText),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                              },
+                              icon: const Icon(Icons.copy_rounded, size: 18),
+                              label: const Text(
+                                'نسخ التقرير',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.ornamentPrimary,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.check_rounded, size: 18),
+                              label: const Text(
+                                'إغلاق',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _buildPlainTextReport(KhatmaReport r) {
+    return '''
+📖 تقرير الختمة القرآنية رقم ${ArabicUtils.toArabicDigits(r.serialNumber)}
+• المدة المستغرقة: ${_formatDetailedDuration(r.durationInDays, r.exactDuration, r.calendarDaysSpan)}
+• تاريخ ووقت البدء: ${_formatDateTimeArabic(r.startedAt)}
+• تاريخ ووقت الإتمام: ${_formatDateTimeArabic(r.completedAt)}
+• معدل الآيات يومياً: ${ArabicUtils.toArabicDigits(r.averageAyahsPerDay.toStringAsFixed(1))} آية/يوم
+• معدل الصفحات يومياً: ${ArabicUtils.toArabicDigits(r.averagePagesPerDay.toStringAsFixed(1))} صفحة/يوم
+• معدل الأجزاء يومياً: ${ArabicUtils.toArabicDigits(r.averageJuzPerDay.toStringAsFixed(2))} جزء/يوم
+• الوقت المعتاد للقراءة: ${r.usualReadingSlot.arabicName} (حوالي ${_formatHourArabic(r.peakReadingHour)})
+''';
+  }
+}
+
+class _ReportDetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final MushafThemeData theme;
+
+  const _ReportDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.ornamentFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.pageInnerBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 19, color: theme.ornamentPrimary),
+          const SizedBox(width: 8),
+          Text(
+            '$label:',
+            style: TextStyle(
+              color: theme.secondaryTextColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.left,
+              style: TextStyle(
+                color: theme.glyphColor,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStatBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final MushafThemeData theme;
+
+  const _MiniStatBox({
+    required this.label,
+    required this.value,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.pageBackground,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: theme.pageInnerBorder),
+        ),
+        child: Column(
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: theme.ornamentPrimary,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: theme.secondaryTextColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatDateTimeArabic(DateTime dt) {
+  final y = ArabicUtils.toArabicDigits(dt.year);
+  final m = ArabicUtils.toArabicDigits(dt.month.toString().padLeft(2, '0'));
+  final d = ArabicUtils.toArabicDigits(dt.day.toString().padLeft(2, '0'));
+  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final h = ArabicUtils.toArabicDigits(hour12.toString().padLeft(2, '0'));
+  final min = ArabicUtils.toArabicDigits(dt.minute.toString().padLeft(2, '0'));
+  final amPm = dt.hour < 12 ? 'ص' : 'م';
+  return '$y/$m/$d — $h:$min $amPm';
+}
+
+String _formatHourArabic(int hour24) {
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  final amPm = hour24 < 12 ? 'صباحاً' : 'مساءً';
+  return '${ArabicUtils.toArabicDigits(hour12)}:٠٠ $amPm';
+}
+
+String _formatDaysLabel(double exactDays, int calendarDays) {
+  if (exactDays < 1.0) {
+    return '${ArabicUtils.toArabicDigits(calendarDays)} يوم';
+  }
+  return '${ArabicUtils.toArabicDigits(exactDays.toStringAsFixed(1))} يوم';
+}
+
+String _formatDetailedDuration(
+  double exactDays,
+  Duration duration,
+  int calendarDays,
+) {
+  final wholeDays = duration.inDays;
+  final remHours = duration.inHours % 24;
+  final remMins = duration.inMinutes % 60;
+
+  if (wholeDays == 0) {
+    if (remHours == 0) {
+      return 'يوم واحد (${ArabicUtils.toArabicDigits(remMins)} دقيقة)';
+    }
+    return 'يوم واحد (${ArabicUtils.toArabicDigits(remHours)} س و ${ArabicUtils.toArabicDigits(remMins)} د)';
+  }
+  return '${ArabicUtils.toArabicDigits(exactDays.toStringAsFixed(1))} يوم (${ArabicUtils.toArabicDigits(wholeDays)} يوم و ${ArabicUtils.toArabicDigits(remHours)} ساعة)';
+}

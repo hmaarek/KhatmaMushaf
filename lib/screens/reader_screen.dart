@@ -7,6 +7,7 @@ import '../widgets/mushaf_page_widget.dart';
 import '../widgets/reader_hud_overlay.dart';
 import 'bookmarks_sheet.dart';
 import 'index_sheet.dart';
+import 'khatma_sheet.dart';
 import 'search_sheet.dart';
 import 'settings_sheet.dart';
 
@@ -114,6 +115,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     context,
                     BookmarksSheet(controller: widget.controller),
                   ),
+                  onOpenKhatma: () => _openModalSheet(
+                    context,
+                    KhatmaSheet(controller: widget.controller),
+                  ),
                   onOpenSettings: () => _openModalSheet(
                     context,
                     SettingsSheet(controller: widget.controller),
@@ -154,6 +159,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
             final theme = widget.controller.theme;
             final isBookmarked =
                 widget.controller.isAyahBookmarked(ayah.verseKey);
+            final activeKhatma = widget.controller.activeKhatma;
+            final isCurrentKhatmaMark =
+                widget.controller.isKhatmaCurrentVerse(ayah.verseKey);
 
             return Directionality(
               textDirection: TextDirection.rtl,
@@ -220,7 +228,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ),
                       const SizedBox(height: 12),
                       Container(
-                        constraints: const BoxConstraints(maxHeight: 180),
+                        constraints: const BoxConstraints(maxHeight: 160),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: theme.ornamentFill,
@@ -238,7 +246,109 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
+
+                      // Khatma Progress Mark Button (Set or Delete/Rollback)
+                      if (isCurrentKhatmaMark)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: theme.bookmarkRibbon,
+                            side: BorderSide(
+                              color: theme.bookmarkRibbon,
+                              width: 1.4,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final updated = await widget.controller
+                                .deleteCurrentKhatmaMark();
+                            if (!sheetCtx.mounted) return;
+                            Navigator.of(sheetCtx).pop();
+                            if (!context.mounted) return;
+                            final prev = updated?.currentMark;
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  duration:
+                                      const Duration(milliseconds: 1800),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: theme.hudSurface,
+                                  content: Directionality(
+                                    textDirection: TextDirection.rtl,
+                                    child: Text(
+                                      prev != null
+                                          ? 'تم حذف علامة الختمة والعودة للموضع السابق: سورة ${prev.surahNameArabic} آية ${ArabicUtils.toArabicDigits(prev.ayahNumber)}'
+                                          : 'تم حذف علامة الختمة الحالية',
+                                      style: TextStyle(color: theme.hudText),
+                                    ),
+                                  ),
+                                ),
+                              );
+                          },
+                          icon: const Icon(Icons.undo_rounded, size: 20),
+                          label: const Text(
+                            'حذف علامة الختمة (العودة للموضع السابق)',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2B8A62),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final res =
+                                await widget.controller.markKhatmaAyah(ayah);
+                            if (!sheetCtx.mounted) return;
+                            Navigator.of(sheetCtx).pop();
+                            if (!context.mounted) return;
+
+                            if (res.justCompleted) {
+                              await showKhatmaReportModal(
+                                context,
+                                controller: widget.controller,
+                                khatma: res.khatma,
+                                isJustCompletedCelebration: true,
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    duration:
+                                        const Duration(milliseconds: 1600),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: theme.hudSurface,
+                                    content: Directionality(
+                                      textDirection: TextDirection.rtl,
+                                      child: Text(
+                                        'تم تحديث علامة ${res.khatma.title} عند سورة ${ayah.surahNameArabic} آية ${ArabicUtils.toArabicDigits(ayah.ayahNumber)}',
+                                        style: TextStyle(color: theme.hudText),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                            }
+                          },
+                          icon: const Icon(Icons.flag_rounded, size: 20),
+                          label: Text(
+                            activeKhatma != null
+                                ? 'تحديد كعلامة الختمة الحالية (#${ArabicUtils.toArabicDigits(activeKhatma.serialNumber)})'
+                                : 'بدء ختمة جديدة وتحديد هذه الآية كعلامة',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           Expanded(
@@ -259,7 +369,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                                onPressed: () async {
+                              onPressed: () async {
                                 final added = await widget.controller
                                     .toggleAyahBookmark(ayah);
                                 if (!sheetCtx.mounted) return;

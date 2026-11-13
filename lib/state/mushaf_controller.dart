@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../models/khatma_models.dart';
 import '../models/mushaf_models.dart';
 import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
+import '../services/khatma_service.dart';
 import '../theme/mushaf_theme.dart';
 
 /// Controls how the 15-line Uthmani Mushaf page is sized/zoomed.
@@ -63,6 +65,7 @@ class MushafController extends ChangeNotifier {
 
   final DatabaseService _dbService = DatabaseService.instance;
   final QpcFontLoaderService _fontLoader = QpcFontLoaderService.instance;
+  final KhatmaService _khatmaService = KhatmaService.instance;
 
   SharedPreferences? _prefs;
   PageController? _pageController;
@@ -78,6 +81,7 @@ class MushafController extends ChangeNotifier {
   List<SurahInfo> _surahs = const <SurahInfo>[];
   List<JuzInfo> _juzs = const <JuzInfo>[];
   List<BookmarkItem> _bookmarks = const <BookmarkItem>[];
+  List<KhatmaRecord> _khatmas = const <KhatmaRecord>[];
   final Set<int> _bookmarkedPages = <int>{};
   final Set<String> _bookmarkedVerseKeys = <String>{};
 
@@ -96,6 +100,23 @@ class MushafController extends ChangeNotifier {
       _bookmarks.where((b) => b.isPageBookmark).toList(growable: false);
   List<BookmarkItem> get ayahBookmarks =>
       _bookmarks.where((b) => b.isAyahBookmark).toList(growable: false);
+
+  List<KhatmaRecord> get khatmas => _khatmas;
+
+  KhatmaRecord? get activeKhatma {
+    for (final k in _khatmas) {
+      if (k.isActive) return k;
+    }
+    return null;
+  }
+
+  List<KhatmaRecord> get completedKhatmas =>
+      _khatmas.where((k) => k.isCompleted).toList(growable: false);
+
+  KhatmaProgressEntry? get currentKhatmaMark => activeKhatma?.currentMark;
+
+  bool isKhatmaCurrentVerse(String verseKey) =>
+      activeKhatma?.currentMark?.verseKey == verseKey;
 
   PageController get pageController {
     _pageController ??= PageController(initialPage: _currentPage - 1);
@@ -137,11 +158,12 @@ class MushafController extends ChangeNotifier {
 
     await _applyWakelock(_keepScreenAwake);
 
-    // Load index tables, bookmarks, and initial page data + QPC font in parallel
+    // Load index tables, bookmarks, khatmas, and initial page data + QPC font in parallel
     final results = await Future.wait<Object?>([
       _dbService.getAllSurahs(),
       _dbService.getAllJuzs(),
       _dbService.getBookmarks(),
+      _khatmaService.getAllKhatmas(),
       _dbService.preloadPages(_currentPage, radius: 1),
       _fontLoader.preloadWindow(_currentPage, radius: 1),
     ]);
@@ -149,6 +171,7 @@ class MushafController extends ChangeNotifier {
     _surahs = results[0] as List<SurahInfo>;
     _juzs = results[1] as List<JuzInfo>;
     _updateBookmarksCache(results[2] as List<BookmarkItem>);
+    _khatmas = results[3] as List<KhatmaRecord>;
 
     _isInitialized = true;
     notifyListeners();
@@ -314,6 +337,85 @@ class MushafController extends ChangeNotifier {
     final updated = await _dbService.getBookmarks();
     _updateBookmarksCache(updated);
     notifyListeners();
+  }
+
+  // -------------------- Khatma Operations --------------------
+
+  /// Starts a new Khatma (with sequential serial number & current date/time).
+  Future<KhatmaRecord> startNewKhatma({
+    String? customTitle,
+    AyahRecord? initialAyah,
+  }) async {
+    final created = await _khatmaService.startNewKhatma(
+      customTitle: customTitle,
+      initialAyah: initialAyah,
+    );
+    _khatmas = await _khatmaService.getAllKhatmas();
+    notifyListeners();
+    return created;
+  }
+
+  /// Marks [ayah] as the current location reached in the active Khatma
+  /// (or starts a new Khatma at [ayah] if none is currently active).
+  /// Returns `(khatma, justCompleted)`.
+  Future<({KhatmaRecord khatma, bool justCompleted})> markKhatmaAyah(
+    AyahRecord ayah, {
+    String? notes,
+  }) async {
+    var current = activeKhatma;
+    current ??= await _khatmaService.startNewKhatma();
+
+    final result = await _khatmaService.markAyahProgress(
+      current.id,
+      ayah,
+      notes: notes,
+    );
+    _khatmas = await _khatmaService.getAllKhatmas();
+    _selectedVerseKey = null;
+    notifyListeners();
+    return result;
+  }
+
+  /// Deletes the current Khatma mark and rolls the mark back to the previous
+  /// last known location.
+  Future<KhatmaRecord?> deleteCurrentKhatmaMark([int? khatmaId]) async {
+    final targetId = khatmaId ?? activeKhatma?.id;
+    if (targetId == null) return null;
+
+    final updated = await _khatmaService.deleteCurrentMark(targetId);
+    _khatmas = await _khatmaService.getAllKhatmas();
+    _selectedVerseKey = null;
+    notifyListeners();
+    return updated;
+  }
+
+  /// Deletes a specific progress checkpoint from a Khatma.
+  Future<void> deleteKhatmaLogEntry(int khatmaId, int logId) async {
+    await _khatmaService.deleteLogEntry(khatmaId, logId);
+    _khatmas = await _khatmaService.getAllKhatmas();
+    notifyListeners();
+  }
+
+  /// Completes the active Khatma at the end of the Quran (Surah An-Nas 114:6).
+  Future<KhatmaRecord?> completeActiveKhatma() async {
+    final current = activeKhatma;
+    if (current == null) return null;
+    final completed = await _khatmaService.completeKhatmaAtEnd(current.id);
+    _khatmas = await _khatmaService.getAllKhatmas();
+    notifyListeners();
+    return completed;
+  }
+
+  /// Deletes an entire Khatma record.
+  Future<void> deleteKhatma(int khatmaId) async {
+    await _khatmaService.deleteKhatma(khatmaId);
+    _khatmas = await _khatmaService.getAllKhatmas();
+    notifyListeners();
+  }
+
+  /// Generates a full [KhatmaReport] for [khatma].
+  KhatmaReport generateKhatmaReport(KhatmaRecord khatma) {
+    return _khatmaService.generateReport(khatma);
   }
 
   Future<AyahRecord?> getAyahRecord(String verseKey) {

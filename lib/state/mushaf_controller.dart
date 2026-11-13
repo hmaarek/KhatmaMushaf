@@ -302,6 +302,9 @@ class MushafController extends ChangeNotifier {
     final added = await _dbService.toggleAyahBookmark(ayah);
     final updated = await _dbService.getBookmarks();
     _updateBookmarksCache(updated);
+    if (!added && _selectedVerseKey == ayah.verseKey) {
+      _selectedVerseKey = null;
+    }
     notifyListeners();
     return added;
   }

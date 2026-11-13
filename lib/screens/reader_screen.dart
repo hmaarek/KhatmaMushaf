@@ -259,11 +259,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              onPressed: () async {
+                                onPressed: () async {
                                 final added = await widget.controller
                                     .toggleAyahBookmark(ayah);
                                 if (!sheetCtx.mounted) return;
-                                ScaffoldMessenger.of(sheetCtx)
+                                Navigator.of(sheetCtx).pop();
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context)
                                   ..hideCurrentSnackBar()
                                   ..showSnackBar(
                                     SnackBar(
@@ -357,5 +359,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
         );
       },
     );
+
+    if (mounted && widget.controller.selectedVerseKey == verseKey) {
+      widget.controller.selectVerse(null);
+    }
   }
 }

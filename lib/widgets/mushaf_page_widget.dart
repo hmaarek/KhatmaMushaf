@@ -84,92 +84,97 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.controller.theme;
-    final scaleMode = widget.controller.fontScaleMode;
-    final cached = widget.controller.currentPage == widget.pageNumber
-        ? widget.controller.currentPageData
-        : null;
-    final fontLoaded =
-        QpcFontLoaderService.instance.isPageFontLoaded(widget.pageNumber);
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final theme = widget.controller.theme;
+        final scaleMode = widget.controller.fontScaleMode;
+        final cached = widget.controller.currentPage == widget.pageNumber
+            ? widget.controller.currentPageData
+            : null;
+        final fontLoaded =
+            QpcFontLoaderService.instance.isPageFontLoaded(widget.pageNumber);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onCenterTap,
-      onDoubleTap: scaleMode == MushafFontScaleMode.pinchToZoom
-          ? () {
-              final currentScale = _zoomController.value.getMaxScaleOnAxis();
-              if (currentScale > 1.05) {
-                _zoomController.value = Matrix4.identity();
-              } else {
-                _zoomController.value = Matrix4.diagonal3Values(1.5, 1.5, 1.0);
-              }
-            }
-          : null,
-      child: Container(
-        color: theme.scaffoldBackground,
-        padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
-        child: FutureBuilder<MushafPageData>(
-          initialData: (cached != null && fontLoaded) ? cached : null,
-          future: _loadFuture,
-          builder: (context, snapshot) {
-            final pageData = snapshot.data;
-            if (pageData == null) {
-              return _buildLoadingSkeleton(theme);
-            }
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                if (scaleMode == MushafFontScaleMode.pinchToZoom) {
-                  return InteractiveViewer(
-                    transformationController: _zoomController,
-                    minScale: 1.0,
-                    maxScale: 2.6,
-                    panEnabled: _isPinchZoomed,
-                    scaleEnabled: true,
-                    child: SizedBox(
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      child: _buildPageFrame(
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.controller.toggleHud,
+          onDoubleTap: scaleMode == MushafFontScaleMode.pinchToZoom
+              ? () {
+                  final currentScale =
+                      _zoomController.value.getMaxScaleOnAxis();
+                  if (currentScale > 1.05) {
+                    _zoomController.value = Matrix4.identity();
+                  } else {
+                    _zoomController.value =
+                        Matrix4.diagonal3Values(1.5, 1.5, 1.0);
+                  }
+                }
+              : null,
+          child: Container(
+            color: theme.scaffoldBackground,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
+            child: FutureBuilder<MushafPageData>(
+              initialData: (cached != null && fontLoaded) ? cached : null,
+              future: _loadFuture,
+              builder: (context, snapshot) {
+                final pageData = snapshot.data;
+                if (pageData == null) {
+                  return _buildLoadingSkeleton(theme);
+                }
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (scaleMode == MushafFontScaleMode.pinchToZoom) {
+                      return InteractiveViewer(
+                        transformationController: _zoomController,
+                        minScale: 1.0,
+                        maxScale: 2.6,
+                        panEnabled: _isPinchZoomed,
+                        scaleEnabled: true,
+                        child: SizedBox(
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          child: _buildPageFrame(
+                            context,
+                            pageData,
+                            theme,
+                            fontScale: 1.0,
+                          ),
+                        ),
+                      );
+                    }
+
+                    final factor = scaleMode.scaleFactor;
+                    if (factor <= 1.01) {
+                      return _buildPageFrame(
                         context,
                         pageData,
                         theme,
                         fontScale: 1.0,
+                      );
+                    }
+
+                    final enlargedHeight = constraints.maxHeight * factor;
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: SizedBox(
+                        width: constraints.maxWidth,
+                        height: enlargedHeight,
+                        child: _buildPageFrame(
+                          context,
+                          pageData,
+                          theme,
+                          fontScale: factor,
+                        ),
                       ),
-                    ),
-                  );
-                }
-
-                final factor = scaleMode.scaleFactor;
-                if (factor <= 1.01) {
-                  return _buildPageFrame(
-                    context,
-                    pageData,
-                    theme,
-                    fontScale: 1.0,
-                  );
-                }
-
-                // Enlarged 15-line mode (Large / Extra Large):
-                // Scales the locked 15-line page height so all 15 lines stay 100% intact
-                // in their exact Uthmani Mushaf line positions with smooth vertical scroll.
-                final enlargedHeight = constraints.maxHeight * factor;
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: SizedBox(
-                    width: constraints.maxWidth,
-                    height: enlargedHeight,
-                    child: _buildPageFrame(
-                      context,
-                      pageData,
-                      theme,
-                      fontScale: factor,
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 

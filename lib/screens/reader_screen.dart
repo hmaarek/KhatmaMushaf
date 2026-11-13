@@ -8,6 +8,7 @@ import '../widgets/reader_hud_overlay.dart';
 import 'bookmarks_sheet.dart';
 import 'index_sheet.dart';
 import 'search_sheet.dart';
+import 'settings_sheet.dart';
 
 class ReaderScreen extends StatefulWidget {
   final MushafController controller;
@@ -22,6 +23,8 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen> {
+  bool _isCurrentPageZoomed = false;
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -67,14 +70,27 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     textDirection: TextDirection.rtl,
                     child: PageView.builder(
                       controller: widget.controller.pageController,
+                      physics: _isCurrentPageZoomed
+                          ? const NeverScrollableScrollPhysics()
+                          : const PageScrollPhysics(),
                       itemCount: 604,
-                      onPageChanged: widget.controller.onPageChanged,
+                      onPageChanged: (idx) {
+                        if (_isCurrentPageZoomed) {
+                          setState(() => _isCurrentPageZoomed = false);
+                        }
+                        widget.controller.onPageChanged(idx);
+                      },
                       itemBuilder: (context, index) {
                         final pageNum = index + 1;
                         return MushafPageWidget(
                           pageNumber: pageNum,
                           controller: widget.controller,
                           onCenterTap: widget.controller.toggleHud,
+                          onZoomChanged: (zoomed) {
+                            if (_isCurrentPageZoomed != zoomed) {
+                              setState(() => _isCurrentPageZoomed = zoomed);
+                            }
+                          },
                           onAyahLongPress: (verseKey) =>
                               _showAyahActionSheet(context, verseKey),
                         );
@@ -97,6 +113,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   onOpenBookmarks: () => _openModalSheet(
                     context,
                     BookmarksSheet(controller: widget.controller),
+                  ),
+                  onOpenSettings: () => _openModalSheet(
+                    context,
+                    SettingsSheet(controller: widget.controller),
                   ),
                 ),
               ],

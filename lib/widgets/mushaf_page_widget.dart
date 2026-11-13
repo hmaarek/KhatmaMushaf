@@ -13,6 +13,7 @@ class MushafPageWidget extends StatefulWidget {
   final MushafController controller;
   final VoidCallback onCenterTap;
   final ValueChanged<String> onAyahLongPress;
+  final ValueChanged<bool>? onZoomChanged;
 
   const MushafPageWidget({
     super.key,
@@ -20,6 +21,7 @@ class MushafPageWidget extends StatefulWidget {
     required this.controller,
     required this.onCenterTap,
     required this.onAyahLongPress,
+    this.onZoomChanged,
   });
 
   @override
@@ -30,11 +32,23 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   Future<MushafPageData>? _loadFuture;
   final List<LongPressGestureRecognizer> _recognizers =
       <LongPressGestureRecognizer>[];
+  final TransformationController _zoomController = TransformationController();
+  bool _isPinchZoomed = false;
 
   @override
   void initState() {
     super.initState();
     _loadFuture = widget.controller.loadPageAndFont(widget.pageNumber);
+    _zoomController.addListener(_onZoomMatrixChanged);
+  }
+
+  void _onZoomMatrixChanged() {
+    final scale = _zoomController.value.getMaxScaleOnAxis();
+    final zoomed = scale > 1.03;
+    if (zoomed != _isPinchZoomed) {
+      _isPinchZoomed = zoomed;
+      widget.onZoomChanged?.call(zoomed);
+    }
   }
 
   @override
@@ -42,7 +56,14 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageNumber != widget.pageNumber) {
       _disposeRecognizers();
+      _zoomController.value = Matrix4.identity();
       _loadFuture = widget.controller.loadPageAndFont(widget.pageNumber);
+    }
+    if (widget.controller.fontScaleMode != MushafFontScaleMode.pinchToZoom &&
+        _isPinchZoomed) {
+      _zoomController.value = Matrix4.identity();
+      _isPinchZoomed = false;
+      widget.onZoomChanged?.call(false);
     }
   }
 
@@ -55,6 +76,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   @override
   void dispose() {
+    _zoomController.removeListener(_onZoomMatrixChanged);
+    _zoomController.dispose();
     _disposeRecognizers();
     super.dispose();
   }
@@ -62,6 +85,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = widget.controller.theme;
+    final scaleMode = widget.controller.fontScaleMode;
     final cached = widget.controller.currentPage == widget.pageNumber
         ? widget.controller.currentPageData
         : null;
@@ -71,9 +95,19 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.onCenterTap,
+      onDoubleTap: scaleMode == MushafFontScaleMode.pinchToZoom
+          ? () {
+              final currentScale = _zoomController.value.getMaxScaleOnAxis();
+              if (currentScale > 1.05) {
+                _zoomController.value = Matrix4.identity();
+              } else {
+                _zoomController.value = Matrix4.diagonal3Values(1.5, 1.5, 1.0);
+              }
+            }
+          : null,
       child: Container(
         color: theme.scaffoldBackground,
-        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+        padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
         child: FutureBuilder<MushafPageData>(
           initialData: (cached != null && fontLoaded) ? cached : null,
           future: _loadFuture,
@@ -82,7 +116,57 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             if (pageData == null) {
               return _buildLoadingSkeleton(theme);
             }
-            return _buildPageFrame(context, pageData, theme);
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                if (scaleMode == MushafFontScaleMode.pinchToZoom) {
+                  return InteractiveViewer(
+                    transformationController: _zoomController,
+                    minScale: 1.0,
+                    maxScale: 2.6,
+                    panEnabled: _isPinchZoomed,
+                    scaleEnabled: true,
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      child: _buildPageFrame(
+                        context,
+                        pageData,
+                        theme,
+                        fontScale: 1.0,
+                      ),
+                    ),
+                  );
+                }
+
+                final factor = scaleMode.scaleFactor;
+                if (factor <= 1.01) {
+                  return _buildPageFrame(
+                    context,
+                    pageData,
+                    theme,
+                    fontScale: 1.0,
+                  );
+                }
+
+                // Enlarged 15-line mode (Large / Extra Large):
+                // Scales the locked 15-line page height so all 15 lines stay 100% intact
+                // in their exact Uthmani Mushaf line positions with smooth vertical scroll.
+                final enlargedHeight = constraints.maxHeight * factor;
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    height: enlargedHeight,
+                    child: _buildPageFrame(
+                      context,
+                      pageData,
+                      theme,
+                      fontScale: factor,
+                    ),
+                  ),
+                );
+              },
+            );
           },
         ),
       ),
@@ -127,8 +211,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   Widget _buildPageFrame(
     BuildContext context,
     MushafPageData pageData,
-    MushafThemeData theme,
-  ) {
+    MushafThemeData theme, {
+    required double fontScale,
+  }) {
     final info = pageData.info;
     final isBookmarked = widget.controller.isPageBookmarked(widget.pageNumber);
 
@@ -143,19 +228,27 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             isCenteredPage: info.isCentered,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14.0, 10.0, 14.0, 8.0),
+            padding: const EdgeInsets.fromLTRB(7.0, 6.0, 7.0, 6.0),
             child: Column(
               children: [
                 // Top running header inside Mushaf margin
                 _buildRunningHeader(info, theme),
-                const SizedBox(height: 4.0),
+                const SizedBox(height: 2.0),
                 // Main Mushaf body: centered layout for Pages 1 & 2, 15-line layout for Pages 3-604
                 Expanded(
                   child: info.isCentered
-                      ? _buildCenteredSpecialPage(pageData, theme)
-                      : _buildStandard15LineBody(pageData, theme),
+                      ? _buildCenteredSpecialPage(
+                          pageData,
+                          theme,
+                          fontScale: fontScale,
+                        )
+                      : _buildStandard15LineBody(
+                          pageData,
+                          theme,
+                          fontScale: fontScale,
+                        ),
                 ),
-                const SizedBox(height: 4.0),
+                const SizedBox(height: 2.0),
                 // Bottom page number in ornamental cartouche
                 _buildFooterPageNumber(info.pageNumber, theme),
               ],
@@ -166,7 +259,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         if (isBookmarked)
           Positioned(
             top: 0,
-            left: 24,
+            left: 20,
             child: IgnorePointer(
               child: CustomPaint(
                 size: const Size(22, 34),
@@ -180,7 +273,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   Widget _buildRunningHeader(MushafPageInfo info, MushafThemeData theme) {
     return SizedBox(
-      height: 22,
+      height: 20,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6.0),
         child: Directionality(
@@ -220,22 +313,24 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   /// Pages 1 & 2 (Al-Fatihah & opening of Al-Baqarah) centered ornamental layout.
   Widget _buildCenteredSpecialPage(
     MushafPageData pageData,
-    MushafThemeData theme,
-  ) {
+    MushafThemeData theme, {
+    required double fontScale,
+  }) {
     _disposeRecognizers();
-    final fontFamily = QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
+    final fontFamily =
+        QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return Center(
           child: Container(
             constraints: BoxConstraints(
-              maxHeight: constraints.maxHeight * 0.78,
-              maxWidth: constraints.maxWidth * 0.94,
+              maxHeight: constraints.maxHeight * 0.82,
+              maxWidth: constraints.maxWidth * 0.98,
             ),
             padding: const EdgeInsets.symmetric(
-              horizontal: 14.0,
-              vertical: 16.0,
+              horizontal: 8.0,
+              vertical: 12.0,
             ),
             decoration: BoxDecoration(
               color: theme.pageBackground,
@@ -257,7 +352,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               children: pageData.lines.map((line) {
                 if (line.isSurahHeader) {
                   return SizedBox(
-                    height: 46,
+                    height: 46 * fontScale.clamp(1.0, 1.25),
                     child: SurahHeaderBanner(
                       surahId: line.surahId ?? 1,
                       headerText: line.headerText ?? '',
@@ -268,8 +363,11 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                   );
                 } else if (line.isBasmala) {
                   return SizedBox(
-                    height: 36,
-                    child: _buildBasmalaLine(theme, fontSize: 26),
+                    height: 38 * fontScale.clamp(1.0, 1.25),
+                    child: _buildBasmalaLine(
+                      theme,
+                      fontSize: 30.0 * fontScale,
+                    ),
                   );
                 } else {
                   return Expanded(
@@ -279,7 +377,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         fontFamily: fontFamily,
                         theme: theme,
                         centered: true,
-                        baseFontSize: 27.0,
+                        baseFontSize: 35.0 * fontScale,
                       ),
                     ),
                   );
@@ -295,17 +393,24 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   /// Pages 3–604 authentic 15-line Madinah Mushaf layout.
   Widget _buildStandard15LineBody(
     MushafPageData pageData,
-    MushafThemeData theme,
-  ) {
+    MushafThemeData theme, {
+    required double fontScale,
+  }) {
     _disposeRecognizers();
-    final fontFamily = QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
+    final fontFamily =
+        QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+      padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
       child: Column(
         children: pageData.lines.map((line) {
           return Expanded(
-            child: _buildStandardLineSlot(line, fontFamily, theme),
+            child: _buildStandardLineSlot(
+              line,
+              fontFamily,
+              theme,
+              fontScale: fontScale,
+            ),
           );
         }).toList(growable: false),
       ),
@@ -315,8 +420,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   Widget _buildStandardLineSlot(
     MushafPageLine line,
     String fontFamily,
-    MushafThemeData theme,
-  ) {
+    MushafThemeData theme, {
+    required double fontScale,
+  }) {
     if (line.isSurahHeader) {
       final sId = line.surahId ?? 1;
       return SurahHeaderBanner(
@@ -328,14 +434,14 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       );
     }
     if (line.isBasmala) {
-      return _buildBasmalaLine(theme, fontSize: 23.0);
+      return _buildBasmalaLine(theme, fontSize: 27.0 * fontScale);
     }
     return _buildTextLine(
       line: line,
       fontFamily: fontFamily,
       theme: theme,
       centered: false,
-      baseFontSize: 25.5,
+      baseFontSize: 33.5 * fontScale,
     );
   }
 
@@ -394,7 +500,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           style: TextStyle(
             fontFamily: fontFamily,
             fontSize: baseFontSize,
-            height: 1.15,
+            height: 1.05,
+            wordSpacing: -2.5,
             color: isSelected ? theme.ornamentPrimary : theme.glyphColor,
             backgroundColor: bgColor,
           ),
@@ -424,10 +531,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   Widget _buildFooterPageNumber(int pageNumber, MushafThemeData theme) {
     return SizedBox(
-      height: 22,
+      height: 20,
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 1.5),
+          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 1.0),
           decoration: BoxDecoration(
             color: theme.ornamentFill,
             borderRadius: BorderRadius.circular(12.0),
@@ -439,7 +546,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           child: Text(
             ArabicUtils.toArabicDigits(pageNumber),
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize: 12.0,
               fontWeight: FontWeight.w700,
               color: theme.secondaryTextColor,
               height: 1.1,
@@ -478,28 +585,28 @@ class _MushafFramePainter extends CustomPainter {
     final outerStroke = Paint()
       ..color = outerBorder
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
+      ..strokeWidth = 1.6;
 
     final innerStroke = Paint()
       ..color = innerBorder
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.9;
+      ..strokeWidth = 0.8;
 
     final outerRRect = RRect.fromRectAndRadius(
-      rect.deflate(2.0),
+      rect.deflate(1.5),
       const Radius.circular(8.0),
     );
     canvas.drawRRect(outerRRect, bgPaint);
     canvas.drawRRect(outerRRect, outerStroke);
 
     final innerRRect = RRect.fromRectAndRadius(
-      rect.deflate(6.0),
+      rect.deflate(4.5),
       const Radius.circular(5.0),
     );
     canvas.drawRRect(innerRRect, innerStroke);
 
     // Subtle corner floral/geometric accents
-    const cornerOffset = 10.0;
+    const cornerOffset = 7.5;
     final corners = [
       const Offset(cornerOffset, cornerOffset),
       Offset(size.width - cornerOffset, cornerOffset),
@@ -510,7 +617,7 @@ class _MushafFramePainter extends CustomPainter {
       ..color = outerBorder
       ..style = PaintingStyle.fill;
     for (final c in corners) {
-      canvas.drawCircle(c, 2.2, dotPaint);
+      canvas.drawCircle(c, 2.0, dotPaint);
     }
   }
 

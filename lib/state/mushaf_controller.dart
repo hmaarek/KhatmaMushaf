@@ -8,9 +8,58 @@ import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
 import '../theme/mushaf_theme.dart';
 
+/// Controls how the 15-line Uthmani Mushaf page is sized/zoomed.
+/// All modes strictly preserve the 15-line Madinah Mushaf page & line breaks.
+enum MushafFontScaleMode {
+  standard(
+    scaleFactor: 1.0,
+    arabicTitle: 'قياسي (كامل الصفحة)',
+    arabicSubtitle: 'عرض الـ ١٥ سطراً كاملة على الشاشة بدون تمرير',
+    badgeText: '١٠٠٪',
+    icon: Icons.fit_screen_rounded,
+  ),
+  large(
+    scaleFactor: 1.22,
+    arabicTitle: 'كبير',
+    arabicSubtitle: 'تكبير خط المصحف مع تمرير عمودي سلس للصفحة',
+    badgeText: '١٢٠٪',
+    icon: Icons.text_increase_rounded,
+  ),
+  extraLarge(
+    scaleFactor: 1.45,
+    arabicTitle: 'كبير جداً',
+    arabicSubtitle: 'خط واضح وكبير جداً مع الحفاظ التام على الـ ١٥ سطراً',
+    badgeText: '١٤٥٪',
+    icon: Icons.format_size_rounded,
+  ),
+  pinchToZoom(
+    scaleFactor: 1.0,
+    arabicTitle: 'تكبير حر باللمس (Pinch-to-Zoom)',
+    arabicSubtitle: 'استخدم إصبعين لتكبير وتصغير الصفحة بحرية تامة',
+    badgeText: 'حر  pinch',
+    icon: Icons.pinch_rounded,
+  );
+
+  final double scaleFactor;
+  final String arabicTitle;
+  final String arabicSubtitle;
+  final String badgeText;
+  final IconData icon;
+
+  const MushafFontScaleMode({
+    required this.scaleFactor,
+    required this.arabicTitle,
+    required this.arabicSubtitle,
+    required this.badgeText,
+    required this.icon,
+  });
+}
+
 class MushafController extends ChangeNotifier {
   static const String _prefLastReadPage = 'mushaf_last_read_page';
   static const String _prefThemeIndex = 'mushaf_theme_index';
+  static const String _prefFontScaleModeIndex = 'mushaf_font_scale_mode_index';
+  static const String _prefKeepScreenAwake = 'mushaf_keep_screen_awake';
 
   final DatabaseService _dbService = DatabaseService.instance;
   final QpcFontLoaderService _fontLoader = QpcFontLoaderService.instance;
@@ -21,6 +70,8 @@ class MushafController extends ChangeNotifier {
   bool _isInitialized = false;
   int _currentPage = 1;
   MushafThemeType _themeType = MushafThemeType.warmPaper;
+  MushafFontScaleMode _fontScaleMode = MushafFontScaleMode.standard;
+  bool _keepScreenAwake = true;
   bool _isHudVisible = false;
   String? _selectedVerseKey;
 
@@ -34,6 +85,8 @@ class MushafController extends ChangeNotifier {
   int get currentPage => _currentPage;
   MushafThemeType get themeType => _themeType;
   MushafThemeData get theme => MushafThemeData.fromType(_themeType);
+  MushafFontScaleMode get fontScaleMode => _fontScaleMode;
+  bool get keepScreenAwake => _keepScreenAwake;
   bool get isHudVisible => _isHudVisible;
   String? get selectedVerseKey => _selectedVerseKey;
   List<SurahInfo> get surahs => _surahs;
@@ -68,20 +121,21 @@ class MushafController extends ChangeNotifier {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    try {
-      await WakelockPlus.enable();
-    } catch (_) {
-      // Ignore wakelock errors in headless/test environments
-    }
-
     _prefs = await SharedPreferences.getInstance();
     final savedPage = (_prefs?.getInt(_prefLastReadPage) ?? 1).clamp(1, 604);
     final savedThemeIdx = (_prefs?.getInt(_prefThemeIndex) ?? 0)
         .clamp(0, MushafThemeType.values.length - 1);
+    final savedScaleIdx = (_prefs?.getInt(_prefFontScaleModeIndex) ?? 0)
+        .clamp(0, MushafFontScaleMode.values.length - 1);
+    final savedWake = _prefs?.getBool(_prefKeepScreenAwake) ?? true;
 
     _currentPage = savedPage;
     _themeType = MushafThemeType.values[savedThemeIdx];
+    _fontScaleMode = MushafFontScaleMode.values[savedScaleIdx];
+    _keepScreenAwake = savedWake;
     _pageController = PageController(initialPage: _currentPage - 1);
+
+    await _applyWakelock(_keepScreenAwake);
 
     // Load index tables, bookmarks, and initial page data + QPC font in parallel
     final results = await Future.wait<Object?>([
@@ -102,6 +156,18 @@ class MushafController extends ChangeNotifier {
     // Preload slightly wider window in background
     unawaited(_dbService.preloadPages(_currentPage, radius: 2));
     unawaited(_fontLoader.preloadWindow(_currentPage, radius: 2));
+  }
+
+  Future<void> _applyWakelock(bool enabled) async {
+    try {
+      if (enabled) {
+        await WakelockPlus.enable();
+      } else {
+        await WakelockPlus.disable();
+      }
+    } catch (_) {
+      // Ignore wakelock errors in headless/test environments
+    }
   }
 
   void _updateBookmarksCache(List<BookmarkItem> items) {
@@ -150,7 +216,7 @@ class MushafController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Jumps or animates directly to [targetPage] (1..604) and optionally highlights [highlightVerseKey].
+  /// Jumps directly to [targetPage] (1..604) and optionally highlights [highlightVerseKey].
   Future<void> goToPage(
     int targetPage, {
     String? highlightVerseKey,
@@ -200,6 +266,21 @@ class MushafController extends ChangeNotifier {
     if (_themeType == newTheme) return;
     _themeType = newTheme;
     _prefs?.setInt(_prefThemeIndex, newTheme.index);
+    notifyListeners();
+  }
+
+  void setFontScaleMode(MushafFontScaleMode mode) {
+    if (_fontScaleMode == mode) return;
+    _fontScaleMode = mode;
+    _prefs?.setInt(_prefFontScaleModeIndex, mode.index);
+    notifyListeners();
+  }
+
+  void setKeepScreenAwake(bool value) {
+    if (_keepScreenAwake == value) return;
+    _keepScreenAwake = value;
+    _prefs?.setBool(_prefKeepScreenAwake, value);
+    unawaited(_applyWakelock(value));
     notifyListeners();
   }
 

@@ -9,6 +9,7 @@ class ReaderHudOverlay extends StatefulWidget {
   final VoidCallback onOpenIndex;
   final VoidCallback onOpenSearch;
   final VoidCallback onOpenBookmarks;
+  final VoidCallback onOpenSettings;
 
   const ReaderHudOverlay({
     super.key,
@@ -16,6 +17,7 @@ class ReaderHudOverlay extends StatefulWidget {
     required this.onOpenIndex,
     required this.onOpenSearch,
     required this.onOpenBookmarks,
+    required this.onOpenSettings,
   });
 
   @override
@@ -62,7 +64,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 child: SafeArea(
                   bottom: false,
                   child: Directionality(
@@ -94,7 +96,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: theme.hudText,
-                                    fontSize: 16,
+                                    fontSize: 15.5,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -108,7 +110,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                   style: TextStyle(
                                     color:
                                         theme.hudText.withValues(alpha: 0.75),
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -123,7 +125,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                           theme: theme,
                           onTap: widget.onOpenSearch,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                         // Bookmarks list button
                         _HudIconButton(
                           icon: Icons.collections_bookmark_outlined,
@@ -133,7 +135,15 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                           theme: theme,
                           onTap: widget.onOpenBookmarks,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
+                        // Settings button (Font Size, Pinch-to-Zoom, Themes)
+                        _HudIconButton(
+                          icon: Icons.tune_rounded,
+                          tooltip: 'إعدادات الخط والعرض (Settings)',
+                          theme: theme,
+                          onTap: widget.onOpenSettings,
+                        ),
+                        const SizedBox(width: 5),
                         // Quick Page Bookmark Ribbon toggle
                         _QuickBookmarkRibbonButton(
                           isBookmarked:
@@ -207,7 +217,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                         // 3 Reading Themes selector row
                         _buildThemeSelectorRow(theme),
                         const SizedBox(height: 10),
-                        // Scrubber header info
+                        // Scrubber header info + quick Font Size / Zoom pill
                         Directionality(
                           textDirection: TextDirection.rtl,
                           child: Row(
@@ -221,12 +231,53 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              Text(
-                                _surahNameForPage(activeSliderPage),
-                                style: TextStyle(
-                                  color: theme.ornamentSecondary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: widget.onOpenSettings,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.hudSurface,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: theme.ornamentSecondary
+                                          .withValues(alpha: 0.45),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        widget.controller.fontScaleMode.icon,
+                                        size: 14,
+                                        color: theme.ornamentSecondary,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'الخط: ${widget.controller.fontScaleMode.arabicTitle}',
+                                        style: TextStyle(
+                                          color: theme.hudText,
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  _surahNameForPage(activeSliderPage),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: theme.ornamentSecondary,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -309,7 +360,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
     if (surahs.isEmpty) return '';
     for (int i = surahs.length - 1; i >= 0; i--) {
       if (page >= surahs[i].startPage) {
-        return 'سورة ${surahs[i].nameArabic} (${surahs[i].nameEnglish})';
+        return 'سورة ${surahs[i].nameArabic}';
       }
     }
     return 'سورة ${surahs.first.nameArabic}';
@@ -416,7 +467,7 @@ class _HudIconButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: label != null ? 10.0 : 9.0,
+            horizontal: label != null ? 9.0 : 8.0,
             vertical: 8.0,
           ),
           child: Stack(
@@ -427,16 +478,16 @@ class _HudIconButton extends StatelessWidget {
                 children: [
                   Icon(
                     effectiveIcon,
-                    size: 20,
+                    size: 19,
                     color: theme.hudText,
                   ),
                   if (label != null) ...[
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     Text(
                       label!,
                       style: TextStyle(
                         color: theme.hudText,
-                        fontSize: 12.5,
+                        fontSize: 12.0,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -496,13 +547,11 @@ class _QuickBookmarkRibbonButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(10.0),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10.0),
             border: Border.all(
-              color: isBookmarked
-                  ? theme.bookmarkRibbon
-                  : Colors.transparent,
+              color: isBookmarked ? theme.bookmarkRibbon : Colors.transparent,
               width: 1.2,
             ),
           ),
@@ -510,7 +559,7 @@ class _QuickBookmarkRibbonButton extends StatelessWidget {
             isBookmarked
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
-            size: 20,
+            size: 19,
             color: isBookmarked ? theme.bookmarkRibbon : theme.hudText,
           ),
         ),

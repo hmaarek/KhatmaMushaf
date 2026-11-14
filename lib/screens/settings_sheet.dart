@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/quran_audio_service.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
 
@@ -243,7 +244,149 @@ class SettingsSheet extends StatelessWidget {
                           ),
 
                           const SizedBox(height: 18),
-                          // Section 3: Last Page Khatma Completion Button toggle
+                          // Section 3: Word Pronunciation & Ayah Recitation Settings
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.record_voice_over_rounded,
+                                color: theme.ornamentPrimary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'نطق الكلمات وتلاوة الآيات',
+                                style: TextStyle(
+                                  color: theme.glyphColor,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.ornamentFill,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.pageInnerBorder),
+                            ),
+                            child: Column(
+                              children: [
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: theme.ornamentPrimary,
+                                  value: controller
+                                      .enableSingleTapWordPronunciation,
+                                  onChanged: controller
+                                      .setEnableSingleTapWordPronunciation,
+                                  title: Text(
+                                    'نطق الكلمة عند اللمس الفردي',
+                                    style: TextStyle(
+                                      color: theme.glyphColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'لمس أي كلمة في المصحف ينطقها فوراً (ويمكن دائماً استخدام الضغط المطوّل على الكلمة)',
+                                    style: TextStyle(
+                                      color: theme.secondaryTextColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                Divider(
+                                  height: 1,
+                                  color: theme.pageInnerBorder
+                                      .withValues(alpha: 0.6),
+                                ),
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: const Color(0xFF2B8A62),
+                                  value: controller.autoPlayAyahAfterWord,
+                                  onChanged: controller.setAutoPlayAyahAfterWord,
+                                  title: Text(
+                                    'تلاوة الآية كاملة بعد نطق الكلمة',
+                                    style: TextStyle(
+                                      color: theme.glyphColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'تشغيل تلاوة الآية الكاملة تلقائياً فور انتهاء نطق الكلمة (أو عند لمس رقم الآية ﴿١﴾)',
+                                    style: TextStyle(
+                                      color: theme.secondaryTextColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                            decoration: BoxDecoration(
+                              color: theme.ornamentFill,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.pageInnerBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'قارئ تلاوة الآية الكاملة:',
+                                  style: TextStyle(
+                                    color: theme.glyphColor,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: QuranReciter.values.map((reciter) {
+                                    final isSelected =
+                                        controller.selectedReciter == reciter;
+                                    return ChoiceChip(
+                                      label: Text(
+                                        reciter.shortArabicName,
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? Colors.white
+                                              : theme.glyphColor,
+                                          fontSize: 12.5,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                        ),
+                                      ),
+                                      selected: isSelected,
+                                      selectedColor: theme.ornamentPrimary,
+                                      backgroundColor: theme.pageBackground,
+                                      checkmarkColor: Colors.white,
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? theme.ornamentPrimary
+                                            : theme.pageInnerBorder,
+                                      ),
+                                      onSelected: (_) => controller
+                                          .setSelectedReciter(reciter),
+                                    );
+                                  }).toList(growable: false),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 18),
+                          // Section 4: Last Page Khatma Completion Button toggle
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,

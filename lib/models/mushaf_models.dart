@@ -149,6 +149,58 @@ class LineWord {
       qpcV1: map['qpc_v1'] as String,
     );
   }
+
+  static final RegExp _arabicDigitsOnlyRegex =
+      RegExp(r'^[\u0660-\u06690-9\s\u200f]+$');
+  static final RegExp _trailingArabicDigitsRegex =
+      RegExp(r'[\u0660-\u06690-9]+\s*$');
+  static final RegExp _stripNonWordMarksRegex =
+      RegExp(r'[\u0660-\u06690-9۞۩\u06D6-\u06ED\u200f]+');
+
+  /// True when this entry represents only a standalone verse-end number marker (e.g. '٣٠').
+  bool get isStandaloneVerseMarker =>
+      _arabicDigitsOnlyRegex.hasMatch(wordUthmani.trim());
+
+  /// True when this word is followed by the ornamental verse-end number marker (e.g. 'ٱلرَّحِيمِ ١').
+  bool get hasTrailingVerseMarker =>
+      !isStandaloneVerseMarker &&
+      _trailingArabicDigitsRegex.hasMatch(wordUthmani.trim()) &&
+      qpcV1.trim().contains(' ');
+
+  /// Returns only the QPC V1 glyph(s) for the word itself (excluding any trailing verse-end marker).
+  String get wordOnlyQpcV1 {
+    if (!hasTrailingVerseMarker) return qpcV1;
+    final trimmed = qpcV1.trim();
+    final lastSpace = trimmed.lastIndexOf(' ');
+    if (lastSpace <= 0) return qpcV1;
+    return trimmed.substring(0, lastSpace);
+  }
+
+  /// Returns the QPC V1 glyph for the ornamental verse-end number marker, if present.
+  String? get verseMarkerQpcV1 {
+    if (isStandaloneVerseMarker) return qpcV1.trim();
+    if (!hasTrailingVerseMarker) return null;
+    final trimmed = qpcV1.trim();
+    final lastSpace = trimmed.lastIndexOf(' ');
+    if (lastSpace < 0) return null;
+    return trimmed.substring(lastSpace + 1);
+  }
+
+  /// Returns the clean vocalized Uthmani word without verse numbers or Hizb/Sajdah marks.
+  String get cleanWordUthmani {
+    final cleaned =
+        wordUthmani.replaceAll(_stripNonWordMarksRegex, ' ').trim();
+    return cleaned.isEmpty ? wordUthmani.trim() : cleaned;
+  }
+
+  /// 1-based word number within the Ayah (parsed from `location` = 'surah:ayah:word').
+  int get wordNumberInAyah {
+    final parts = location.split(':');
+    if (parts.length >= 3) {
+      return int.tryParse(parts[2]) ?? (wordIndex + 1);
+    }
+    return wordIndex + 1;
+  }
 }
 
 class MushafPageLine {

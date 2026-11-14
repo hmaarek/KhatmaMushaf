@@ -8,6 +8,7 @@ import '../models/mushaf_models.dart';
 import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
 import '../services/khatma_service.dart';
+import '../services/quran_audio_service.dart';
 import '../services/smart_search_service.dart';
 import '../theme/mushaf_theme.dart';
 
@@ -65,10 +66,18 @@ class MushafController extends ChangeNotifier {
   static const String _prefKeepScreenAwake = 'mushaf_keep_screen_awake';
   static const String _prefShowLastPageKhatmaButton =
       'mushaf_show_last_page_khatma_button';
+  static const String _prefSingleTapWordPronunciation =
+      'mushaf_single_tap_word_pronunciation';
+  static const String _prefShownSingleTapWordIntro =
+      'mushaf_shown_single_tap_word_intro';
+  static const String _prefAutoPlayAyahAfterWord =
+      'mushaf_auto_play_ayah_after_word';
+  static const String _prefReciterIndex = 'mushaf_reciter_index';
 
   final DatabaseService _dbService = DatabaseService.instance;
   final QpcFontLoaderService _fontLoader = QpcFontLoaderService.instance;
   final KhatmaService _khatmaService = KhatmaService.instance;
+  final QuranAudioService audioService = QuranAudioService.instance;
 
   SharedPreferences? _prefs;
   PageController? _pageController;
@@ -79,6 +88,10 @@ class MushafController extends ChangeNotifier {
   MushafFontScaleMode _fontScaleMode = MushafFontScaleMode.standard;
   bool _keepScreenAwake = true;
   bool _showLastPageKhatmaButton = true;
+  bool _enableSingleTapWordPronunciation = true;
+  bool _hasShownSingleTapIntroDialog = false;
+  bool _autoPlayAyahAfterWord = false;
+  QuranReciter _selectedReciter = QuranReciter.husaryMurattal;
   bool _isHudVisible = false;
   String? _selectedVerseKey;
 
@@ -96,8 +109,17 @@ class MushafController extends ChangeNotifier {
   MushafFontScaleMode get fontScaleMode => _fontScaleMode;
   bool get keepScreenAwake => _keepScreenAwake;
   bool get showLastPageKhatmaButton => _showLastPageKhatmaButton;
+  bool get enableSingleTapWordPronunciation =>
+      _enableSingleTapWordPronunciation;
+  bool get hasShownSingleTapIntroDialog => _hasShownSingleTapIntroDialog;
+  bool get autoPlayAyahAfterWord => _autoPlayAyahAfterWord;
+  QuranReciter get selectedReciter => _selectedReciter;
   bool get isHudVisible => _isHudVisible;
   String? get selectedVerseKey => _selectedVerseKey;
+  LineWord? get selectedWord => audioService.activeWord;
+  String? get selectedWordLocation => audioService.activeWord?.location;
+  String? get playingAyahVerseKey =>
+      audioService.isPlayingAyah ? audioService.activeVerseKey : null;
   List<SurahInfo> get surahs => _surahs;
   List<JuzInfo> get juzs => _juzs;
   List<BookmarkItem> get bookmarks => _bookmarks;
@@ -147,6 +169,8 @@ class MushafController extends ChangeNotifier {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
+    audioService.addListener(_onAudioServiceChanged);
+
     _prefs = await SharedPreferences.getInstance();
     final savedPage = (_prefs?.getInt(_prefLastReadPage) ?? 1).clamp(1, 604);
     final savedThemeIdx = (_prefs?.getInt(_prefThemeIndex) ?? 0)
@@ -156,12 +180,24 @@ class MushafController extends ChangeNotifier {
     final savedWake = _prefs?.getBool(_prefKeepScreenAwake) ?? true;
     final savedShowKhatmaBtn =
         _prefs?.getBool(_prefShowLastPageKhatmaButton) ?? true;
+    final savedSingleTapWord =
+        _prefs?.getBool(_prefSingleTapWordPronunciation) ?? true;
+    final savedShownSingleTapIntro =
+        _prefs?.getBool(_prefShownSingleTapWordIntro) ?? false;
+    final savedAutoPlayAyah =
+        _prefs?.getBool(_prefAutoPlayAyahAfterWord) ?? false;
+    final savedReciterIdx = (_prefs?.getInt(_prefReciterIndex) ?? 0)
+        .clamp(0, QuranReciter.values.length - 1);
 
     _currentPage = savedPage;
     _themeType = MushafThemeType.values[savedThemeIdx];
     _fontScaleMode = MushafFontScaleMode.values[savedScaleIdx];
     _keepScreenAwake = savedWake;
     _showLastPageKhatmaButton = savedShowKhatmaBtn;
+    _enableSingleTapWordPronunciation = savedSingleTapWord;
+    _hasShownSingleTapIntroDialog = savedShownSingleTapIntro;
+    _autoPlayAyahAfterWord = savedAutoPlayAyah;
+    _selectedReciter = QuranReciter.values[savedReciterIdx];
     _pageController = PageController(initialPage: _currentPage - 1);
 
     await _applyWakelock(_keepScreenAwake);
@@ -227,6 +263,10 @@ class MushafController extends ChangeNotifier {
     return results[0] as MushafPageData;
   }
 
+  void _onAudioServiceChanged() {
+    notifyListeners();
+  }
+
   /// Called by [PageView.onPageChanged] when the user swipes between pages.
   void onPageChanged(int index) {
     final newPage = (index + 1).clamp(1, 604);
@@ -234,6 +274,9 @@ class MushafController extends ChangeNotifier {
 
     _currentPage = newPage;
     _selectedVerseKey = null;
+    if (audioService.hasActivePanel) {
+      unawaited(audioService.stop(clearSelection: true));
+    }
     _prefs?.setInt(_prefLastReadPage, _currentPage);
     notifyListeners();
 
@@ -259,6 +302,9 @@ class MushafController extends ChangeNotifier {
 
     _currentPage = clamped;
     _selectedVerseKey = highlightVerseKey;
+    if (audioService.hasActivePanel) {
+      unawaited(audioService.stop(clearSelection: true));
+    }
     if (hideHud) {
       _isHudVisible = false;
     }
@@ -273,6 +319,12 @@ class MushafController extends ChangeNotifier {
   }
 
   void toggleHud() {
+    if (audioService.hasActivePanel) {
+      unawaited(audioService.stop(clearSelection: true));
+      _selectedVerseKey = null;
+      notifyListeners();
+      return;
+    }
     if (_selectedVerseKey != null) {
       _selectedVerseKey = null;
       notifyListeners();
@@ -321,6 +373,73 @@ class MushafController extends ChangeNotifier {
     _showLastPageKhatmaButton = value;
     _prefs?.setBool(_prefShowLastPageKhatmaButton, value);
     notifyListeners();
+  }
+
+  void setEnableSingleTapWordPronunciation(bool value) {
+    if (_enableSingleTapWordPronunciation == value) return;
+    _enableSingleTapWordPronunciation = value;
+    _prefs?.setBool(_prefSingleTapWordPronunciation, value);
+    notifyListeners();
+  }
+
+  void markSingleTapIntroShown() {
+    if (_hasShownSingleTapIntroDialog) return;
+    _hasShownSingleTapIntroDialog = true;
+    _prefs?.setBool(_prefShownSingleTapWordIntro, true);
+    notifyListeners();
+  }
+
+  void setAutoPlayAyahAfterWord(bool value) {
+    if (_autoPlayAyahAfterWord == value) return;
+    _autoPlayAyahAfterWord = value;
+    _prefs?.setBool(_prefAutoPlayAyahAfterWord, value);
+    notifyListeners();
+  }
+
+  void setSelectedReciter(QuranReciter reciter) {
+    if (_selectedReciter == reciter) return;
+    _selectedReciter = reciter;
+    _prefs?.setInt(_prefReciterIndex, reciter.index);
+    notifyListeners();
+  }
+
+  /// Plays the pronunciation of [word], optionally followed by the full Ayah
+  /// when [_autoPlayAyahAfterWord] is enabled.
+  Future<void> pronounceWord(LineWord word) async {
+    if (_isHudVisible) {
+      _isHudVisible = false;
+    }
+    final ayahRecord = await _dbService.getAyahByVerseKey(word.verseKey);
+    await audioService.playWord(
+      word,
+      autoPlayAyahAfter: _autoPlayAyahAfterWord,
+      reciter: _selectedReciter,
+      ayahFallbackText: ayahRecord?.textUthmani,
+    );
+  }
+
+  /// Plays the full Ayah recitation for [surahId] : [ayahNumber].
+  Future<void> playAyahAudio(
+    int surahId,
+    int ayahNumber, {
+    bool keepActiveWord = false,
+  }) async {
+    if (_isHudVisible) {
+      _isHudVisible = false;
+    }
+    final verseKey = '$surahId:$ayahNumber';
+    final ayahRecord = await _dbService.getAyahByVerseKey(verseKey);
+    await audioService.playFullAyah(
+      surahId: surahId,
+      ayahNumber: ayahNumber,
+      reciter: _selectedReciter,
+      fallbackTextUthmani: ayahRecord?.textUthmani,
+      keepActiveWord: keepActiveWord,
+    );
+  }
+
+  Future<void> stopAudio({bool clearSelection = true}) async {
+    await audioService.stop(clearSelection: clearSelection);
   }
 
   void cycleTheme() {
@@ -456,6 +575,7 @@ class MushafController extends ChangeNotifier {
 
   @override
   void dispose() {
+    audioService.removeListener(_onAudioServiceChanged);
     _pageController?.dispose();
     super.dispose();
   }

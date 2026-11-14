@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/mushaf_models.dart';
 import '../state/mushaf_controller.dart';
 import '../utils/arabic_utils.dart';
 import '../widgets/mushaf_page_widget.dart';
@@ -87,13 +89,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           pageNumber: pageNum,
                           controller: widget.controller,
                           onCenterTap: widget.controller.toggleHud,
+                          onWordTap: (word) =>
+                              _handleWordSingleTap(context, word),
+                          onVerseMarkerTap: (word) =>
+                              _handleVerseMarkerTap(word),
                           onZoomChanged: (zoomed) {
                             if (_isCurrentPageZoomed != zoomed) {
                               setState(() => _isCurrentPageZoomed = zoomed);
                             }
                           },
-                          onAyahLongPress: (verseKey) =>
-                              _showAyahActionSheet(context, verseKey),
+                          onAyahLongPress: (verseKey, tappedWord) =>
+                              _showAyahActionSheet(
+                                context,
+                                verseKey,
+                                tappedWord: tappedWord,
+                              ),
                           onCompleteKhatmaTap: () =>
                               _handleCompleteKhatmaFromLastPage(context),
                         );
@@ -101,6 +111,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ),
                 ),
+
+                // Floating Word Pronunciation & Full Ayah Audio Bar
+                if (widget.controller.audioService.hasActivePanel)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 16,
+                    child: SafeArea(
+                      top: false,
+                      child: _buildFloatingPronunciationBar(context),
+                    ),
+                  ),
 
                 // Minimal translucent HUD (top & bottom bars)
                 ReaderHudOverlay(
@@ -140,6 +162,371 @@ class _ReaderScreenState extends State<ReaderScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => sheet,
+    );
+  }
+
+  Future<void> _handleWordSingleTap(
+    BuildContext context,
+    LineWord word,
+  ) async {
+    final isFirstTime = !widget.controller.hasShownSingleTapIntroDialog;
+    unawaited(widget.controller.pronounceWord(word));
+
+    if (isFirstTime && context.mounted) {
+      widget.controller.markSingleTapIntroShown();
+      await _showFirstTimeSingleTapDialog(context);
+    }
+  }
+
+  Future<void> _handleVerseMarkerTap(LineWord word) async {
+    await widget.controller.playAyahAudio(
+      word.surahId,
+      word.ayahNumber,
+    );
+  }
+
+  Future<void> _showFirstTimeSingleTapDialog(BuildContext context) async {
+    final theme = widget.controller.theme;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: theme.pageBackground,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: theme.pageOuterBorder, width: 1.5),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.record_voice_over_rounded,
+                  color: theme.ornamentPrimary,
+                  size: 26,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'ميزة نطق الكلمات باللمس',
+                    style: TextStyle(
+                      color: theme.glyphColor,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'عند لمس أي كلمة في المصحف الشريف لمسة واحدة، سيقوم التطبيق بنطق الكلمة فوراً لمساعدتك على معرفة نطقها الصحيح أثناء القراءة.\n\n'
+              '• كما يمكنك لمس رقم الآية المزخرف ﴿١﴾ للاستماع إلى تلاوة الآية كاملة.\n'
+              '• يمكنك في أي وقت تعديل هذه الميزة أو إيقاف اللمس الفردي أو تفعيل تلاوة الآية تلقائياً بعد الكلمة من خلال «الإعدادات».',
+              style: TextStyle(
+                color: theme.secondaryTextColor,
+                fontSize: 14,
+                height: 1.55,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            actions: [
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.of(dialogCtx).pop();
+                  _openModalSheet(
+                    context,
+                    SettingsSheet(controller: widget.controller),
+                  );
+                },
+                icon: Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: theme.ornamentPrimary,
+                ),
+                label: Text(
+                  'فتح الإعدادات',
+                  style: TextStyle(
+                    color: theme.ornamentPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.ornamentPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text(
+                  'حسناً، فهمت',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFloatingPronunciationBar(BuildContext context) {
+    final theme = widget.controller.theme;
+    final audio = widget.controller.audioService;
+    final activeWord = audio.activeWord;
+    final surahId = audio.activeSurahId ?? activeWord?.surahId ?? 1;
+    final ayahNum = audio.activeAyahNumber ?? activeWord?.ayahNumber ?? 1;
+    final surahInfo = widget.controller.getSurahById(surahId);
+    final surahName = surahInfo?.nameArabic ?? '';
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: theme.pageBackground.withValues(alpha: 0.97),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.ornamentPrimary,
+              width: 1.6,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.ornamentFill,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: theme.pageInnerBorder),
+                    ),
+                    child: Text(
+                      activeWord != null
+                          ? activeWord.cleanWordUthmani
+                          : 'الآية ${ArabicUtils.toArabicDigits(ayahNum)}',
+                      style: TextStyle(
+                        color: theme.glyphColor,
+                        fontSize: activeWord != null ? 22 : 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          activeWord != null
+                              ? 'سورة $surahName • آية ${ArabicUtils.toArabicDigits(ayahNum)} (كلمة ${ArabicUtils.toArabicDigits(activeWord.wordNumberInAyah)})'
+                              : 'سورة $surahName • تلاوة الآية ${ArabicUtils.toArabicDigits(ayahNum)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: theme.ornamentPrimary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            if (audio.isBusy) ...[
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.8,
+                                  color: theme.ornamentPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ] else if (audio.isPlaying) ...[
+                              const Icon(
+                                Icons.volume_up_rounded,
+                                size: 15,
+                                color: Color(0xFF2B8A62),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Flexible(
+                              child: Text(
+                                audio.statusMessage ??
+                                    (activeWord != null
+                                        ? 'اضغط لإعادة نطق الكلمة أو سماع الآية كاملة'
+                                        : 'القارئ: ${widget.controller.selectedReciter.shortArabicName}'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: theme.secondaryTextColor,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: theme.secondaryTextColor,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        widget.controller.stopAudio(clearSelection: true),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (activeWord != null) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.glyphColor,
+                          side: BorderSide(color: theme.ornamentPrimary),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () =>
+                            widget.controller.pronounceWord(activeWord),
+                        icon: Icon(
+                          Icons.replay_rounded,
+                          size: 17,
+                          color: theme.ornamentPrimary,
+                        ),
+                        label: const Text(
+                          'إعادة الكلمة',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: audio.isPlayingAyah
+                            ? const Color(0xFFB54434)
+                            : const Color(0xFF2B8A62),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        if (audio.isPlayingAyah) {
+                          widget.controller.stopAudio(clearSelection: false);
+                        } else {
+                          widget.controller.playAyahAudio(
+                            surahId,
+                            ayahNum,
+                            keepActiveWord: activeWord != null,
+                          );
+                        }
+                      },
+                      icon: Icon(
+                        audio.isPlayingAyah
+                            ? Icons.stop_rounded
+                            : Icons.play_circle_fill_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        audio.isPlayingAyah
+                            ? 'إيقاف التلاوة'
+                            : 'تلاوة الآية كاملة',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => widget.controller.setAutoPlayAyahAfterWord(
+                      !widget.controller.autoPlayAyahAfterWord,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.controller.autoPlayAyahAfterWord
+                            ? const Color(0xFF2B8A62).withValues(alpha: 0.15)
+                            : theme.ornamentFill,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: widget.controller.autoPlayAyahAfterWord
+                              ? const Color(0xFF2B8A62)
+                              : theme.pageInnerBorder,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            widget.controller.autoPlayAyahAfterWord
+                                ? Icons.check_circle_rounded
+                                : Icons.playlist_play_rounded,
+                            size: 16,
+                            color: widget.controller.autoPlayAyahAfterWord
+                                ? const Color(0xFF2B8A62)
+                                : theme.secondaryTextColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'تلاوة الآية تلقائياً',
+                            style: TextStyle(
+                              color: widget.controller.autoPlayAyahAfterWord
+                                  ? const Color(0xFF2B8A62)
+                                  : theme.secondaryTextColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -242,8 +629,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _showAyahActionSheet(
     BuildContext context,
-    String verseKey,
-  ) async {
+    String verseKey, {
+    LineWord? tappedWord,
+  }) async {
     final ayah = await widget.controller.getAyahRecord(verseKey);
     if (!context.mounted || ayah == null) return;
 
@@ -256,6 +644,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           listenable: widget.controller,
           builder: (context, _) {
             final theme = widget.controller.theme;
+            final audio = widget.controller.audioService;
             final isBookmarked =
                 widget.controller.isAyahBookmarked(ayah.verseKey);
             final activeKhatma = widget.controller.activeKhatma;
@@ -326,8 +715,201 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+
+                      // Word Pronunciation & Full Ayah Recitation Card
                       Container(
-                        constraints: const BoxConstraints(maxHeight: 160),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.ornamentFill,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: theme.ornamentPrimary.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (tappedWord != null &&
+                                !tappedWord.isStandaloneVerseMarker) ...[
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.record_voice_over_rounded,
+                                        color: theme.ornamentPrimary,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'الكلمة المحددة (رقم ${ArabicUtils.toArabicDigits(tappedWord.wordNumberInAyah)}):',
+                                        style: TextStyle(
+                                          color: theme.secondaryTextColor,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.pageBackground,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: theme.ornamentPrimary,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      tappedWord.cleanWordUthmani,
+                                      style: TextStyle(
+                                        color: theme.glyphColor,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            Row(
+                              children: [
+                                if (tappedWord != null &&
+                                    !tappedWord.isStandaloneVerseMarker) ...[
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: theme.ornamentPrimary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 10,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        widget.controller
+                                            .pronounceWord(tappedWord);
+                                      },
+                                      icon: const Icon(
+                                        Icons.volume_up_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        'نطق الكلمة',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                ],
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: audio.isPlayingAyah &&
+                                              audio.activeVerseKey ==
+                                                  ayah.verseKey
+                                          ? const Color(0xFFB54434)
+                                          : const Color(0xFF2B8A62),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      if (audio.isPlayingAyah &&
+                                          audio.activeVerseKey ==
+                                              ayah.verseKey) {
+                                        widget.controller.stopAudio(
+                                          clearSelection: false,
+                                        );
+                                      } else {
+                                        widget.controller.playAyahAudio(
+                                          ayah.surahId,
+                                          ayah.ayahNumber,
+                                          keepActiveWord: tappedWord != null,
+                                        );
+                                      }
+                                    },
+                                    icon: Icon(
+                                      audio.isPlayingAyah &&
+                                              audio.activeVerseKey ==
+                                                  ayah.verseKey
+                                          ? Icons.stop_rounded
+                                          : Icons.play_circle_fill_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      audio.isPlayingAyah &&
+                                              audio.activeVerseKey ==
+                                                  ayah.verseKey
+                                          ? 'إيقاف الآية'
+                                          : 'تلاوة الآية كاملة',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () =>
+                                  widget.controller.setAutoPlayAyahAfterWord(
+                                !widget.controller.autoPlayAyahAfterWord,
+                              ),
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      widget.controller.autoPlayAyahAfterWord
+                                          ? Icons.check_box_rounded
+                                          : Icons
+                                              .check_box_outline_blank_rounded,
+                                      size: 18,
+                                      color: widget
+                                              .controller.autoPlayAyahAfterWord
+                                          ? const Color(0xFF2B8A62)
+                                          : theme.secondaryTextColor,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'تشغيل تلاوة الآية كاملة تلقائياً بعد انتهاء نطق الكلمة (${widget.controller.selectedReciter.shortArabicName})',
+                                        style: TextStyle(
+                                          color: theme.secondaryTextColor,
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 130),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: theme.ornamentFill,

@@ -13,7 +13,9 @@ class MushafPageWidget extends StatefulWidget {
   final int pageNumber;
   final MushafController controller;
   final VoidCallback onCenterTap;
-  final ValueChanged<String> onAyahLongPress;
+  final void Function(String verseKey, LineWord? tappedWord) onAyahLongPress;
+  final ValueChanged<LineWord>? onWordTap;
+  final ValueChanged<LineWord>? onVerseMarkerTap;
   final ValueChanged<bool>? onZoomChanged;
   final VoidCallback? onCompleteKhatmaTap;
 
@@ -23,6 +25,8 @@ class MushafPageWidget extends StatefulWidget {
     required this.controller,
     required this.onCenterTap,
     required this.onAyahLongPress,
+    this.onWordTap,
+    this.onVerseMarkerTap,
     this.onZoomChanged,
     this.onCompleteKhatmaTap,
   });
@@ -33,8 +37,7 @@ class MushafPageWidget extends StatefulWidget {
 
 class _MushafPageWidgetState extends State<MushafPageWidget> {
   Future<MushafPageData>? _loadFuture;
-  final List<LongPressGestureRecognizer> _recognizers =
-      <LongPressGestureRecognizer>[];
+  final List<GestureRecognizer> _recognizers = <GestureRecognizer>[];
   final TransformationController _zoomController = TransformationController();
   bool _isPinchZoomed = false;
 
@@ -482,57 +485,190 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
-  Widget _buildCircularTextLine({
+  List<InlineSpan> _buildWordSpans({
     required MushafPageLine line,
     required String fontFamily,
     required MushafThemeData theme,
+    required double fontSize,
+    required double lineHeight,
+    required double wordSpacing,
   }) {
     final selectedVerse = widget.controller.selectedVerseKey;
+    final playingAyahKey = widget.controller.playingAyahVerseKey;
+    final selectedWordLoc = widget.controller.selectedWordLocation;
+    final singleTapEnabled =
+        widget.controller.enableSingleTapWordPronunciation;
+
     final spans = <InlineSpan>[];
 
     for (int i = 0; i < line.words.length; i++) {
       final word = line.words[i];
-      final isSelected = selectedVerse == word.verseKey;
+      final isLastInLine = i == line.words.length - 1;
+      final isSelectedAyah =
+          selectedVerse == word.verseKey || playingAyahKey == word.verseKey;
+      final isSelectedWord = selectedWordLoc == word.location;
       final isKhatmaMark =
           widget.controller.isKhatmaCurrentVerse(word.verseKey);
       final isBookmarkedAyah =
           widget.controller.isAyahBookmarked(word.verseKey);
 
-      final recognizer = LongPressGestureRecognizer()
-        ..onLongPress = () {
-          widget.controller.selectVerse(word.verseKey);
-          widget.onAyahLongPress(word.verseKey);
-        };
-      _recognizers.add(recognizer);
-
-      Color? bgColor;
-      if (isSelected) {
-        bgColor = theme.ayahHighlightFill;
+      Color? baseBgColor;
+      if (isSelectedAyah) {
+        baseBgColor = theme.ayahHighlightFill;
       } else if (isKhatmaMark) {
-        bgColor = const Color(0x3D2B8A62);
+        baseBgColor = const Color(0x3D2B8A62);
       } else if (isBookmarkedAyah) {
-        bgColor = theme.ayahHighlightFill.withValues(alpha: 0.14);
+        baseBgColor = theme.ayahHighlightFill.withValues(alpha: 0.14);
       }
 
-      spans.add(
-        TextSpan(
-          text: i < line.words.length - 1 ? '${word.qpcV1} ' : word.qpcV1,
-          recognizer: recognizer,
-          style: TextStyle(
-            fontFamily: fontFamily,
-            fontSize: 42.0,
-            height: 1.12,
-            wordSpacing: -2.0,
-            color: isSelected
-                ? theme.ornamentPrimary
-                : isKhatmaMark
-                    ? const Color(0xFF1F7A53)
-                    : theme.glyphColor,
-            backgroundColor: bgColor,
+      final Color wordBgColor = isSelectedWord
+          ? theme.ornamentPrimary.withValues(alpha: 0.30)
+          : (baseBgColor ?? Colors.transparent);
+
+      final Color wordTextColor = isSelectedWord
+          ? theme.ornamentPrimary
+          : isSelectedAyah
+              ? theme.ornamentPrimary
+              : isKhatmaMark
+                  ? const Color(0xFF1F7A53)
+                  : theme.glyphColor;
+
+      if (word.isStandaloneVerseMarker) {
+        final markerRecognizer = _WordTapAndLongPressRecognizer(
+          onTap: widget.onVerseMarkerTap != null
+              ? () => widget.onVerseMarkerTap!(word)
+              : null,
+          onLongPress: () {
+            widget.controller.selectVerse(word.verseKey);
+            widget.onAyahLongPress(word.verseKey, null);
+          },
+        );
+        _recognizers.add(markerRecognizer);
+
+        spans.add(
+          TextSpan(
+            text: isLastInLine ? word.qpcV1 : '${word.qpcV1} ',
+            recognizer: markerRecognizer,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              height: lineHeight,
+              wordSpacing: wordSpacing,
+              color: isSelectedAyah
+                  ? theme.ornamentPrimary
+                  : isKhatmaMark
+                      ? const Color(0xFF1F7A53)
+                      : theme.glyphColor,
+              backgroundColor: baseBgColor,
+            ),
           ),
-        ),
-      );
+        );
+      } else if (word.hasTrailingVerseMarker) {
+        final wordPart = word.wordOnlyQpcV1;
+        final markerPart = word.verseMarkerQpcV1!;
+
+        final wordRecognizer = _WordTapAndLongPressRecognizer(
+          onTap: singleTapEnabled && widget.onWordTap != null
+              ? () => widget.onWordTap!(word)
+              : null,
+          onLongPress: () {
+            widget.controller.selectVerse(word.verseKey);
+            widget.onAyahLongPress(word.verseKey, word);
+          },
+        );
+        _recognizers.add(wordRecognizer);
+
+        final markerRecognizer = _WordTapAndLongPressRecognizer(
+          onTap: widget.onVerseMarkerTap != null
+              ? () => widget.onVerseMarkerTap!(word)
+              : null,
+          onLongPress: () {
+            widget.controller.selectVerse(word.verseKey);
+            widget.onAyahLongPress(word.verseKey, word);
+          },
+        );
+        _recognizers.add(markerRecognizer);
+
+        spans.add(
+          TextSpan(
+            text: '$wordPart ',
+            recognizer: wordRecognizer,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              height: lineHeight,
+              wordSpacing: wordSpacing,
+              color: wordTextColor,
+              backgroundColor:
+                  isSelectedWord ? wordBgColor : baseBgColor,
+            ),
+          ),
+        );
+
+        spans.add(
+          TextSpan(
+            text: isLastInLine ? markerPart : '$markerPart ',
+            recognizer: markerRecognizer,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              height: lineHeight,
+              wordSpacing: wordSpacing,
+              color: isSelectedAyah
+                  ? theme.ornamentPrimary
+                  : isKhatmaMark
+                      ? const Color(0xFF1F7A53)
+                      : theme.glyphColor,
+              backgroundColor: baseBgColor,
+            ),
+          ),
+        );
+      } else {
+        final wordRecognizer = _WordTapAndLongPressRecognizer(
+          onTap: singleTapEnabled && widget.onWordTap != null
+              ? () => widget.onWordTap!(word)
+              : null,
+          onLongPress: () {
+            widget.controller.selectVerse(word.verseKey);
+            widget.onAyahLongPress(word.verseKey, word);
+          },
+        );
+        _recognizers.add(wordRecognizer);
+
+        spans.add(
+          TextSpan(
+            text: isLastInLine ? word.qpcV1 : '${word.qpcV1} ',
+            recognizer: wordRecognizer,
+            style: TextStyle(
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              height: lineHeight,
+              wordSpacing: wordSpacing,
+              color: wordTextColor,
+              backgroundColor:
+                  isSelectedWord ? wordBgColor : baseBgColor,
+            ),
+          ),
+        );
+      }
     }
+
+    return spans;
+  }
+
+  Widget _buildCircularTextLine({
+    required MushafPageLine line,
+    required String fontFamily,
+    required MushafThemeData theme,
+  }) {
+    final spans = _buildWordSpans(
+      line: line,
+      fontFamily: fontFamily,
+      theme: theme,
+      fontSize: 42.0,
+      lineHeight: 1.12,
+      wordSpacing: -2.0,
+    );
 
     return FittedBox(
       fit: BoxFit.fitWidth,
@@ -574,7 +710,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _OpeningCartoucheBadge(
-                  text: '$revelationAr',
+                  text: revelationAr,
                   theme: theme,
                 ),
                 Expanded(
@@ -688,52 +824,14 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     required bool centered,
     required double baseFontSize,
   }) {
-    final selectedVerse = widget.controller.selectedVerseKey;
-    final spans = <InlineSpan>[];
-
-    for (int i = 0; i < line.words.length; i++) {
-      final word = line.words[i];
-      final isSelected = selectedVerse == word.verseKey;
-      final isKhatmaMark =
-          widget.controller.isKhatmaCurrentVerse(word.verseKey);
-      final isBookmarkedAyah =
-          widget.controller.isAyahBookmarked(word.verseKey);
-
-      final recognizer = LongPressGestureRecognizer()
-        ..onLongPress = () {
-          widget.controller.selectVerse(word.verseKey);
-          widget.onAyahLongPress(word.verseKey);
-        };
-      _recognizers.add(recognizer);
-
-      Color? bgColor;
-      if (isSelected) {
-        bgColor = theme.ayahHighlightFill;
-      } else if (isKhatmaMark) {
-        bgColor = const Color(0x3D2B8A62);
-      } else if (isBookmarkedAyah) {
-        bgColor = theme.ayahHighlightFill.withValues(alpha: 0.14);
-      }
-
-      spans.add(
-        TextSpan(
-          text: i < line.words.length - 1 ? '${word.qpcV1} ' : word.qpcV1,
-          recognizer: recognizer,
-          style: TextStyle(
-            fontFamily: fontFamily,
-            fontSize: baseFontSize,
-            height: 1.05,
-            wordSpacing: -2.5,
-            color: isSelected
-                ? theme.ornamentPrimary
-                : isKhatmaMark
-                    ? const Color(0xFF1F7A53)
-                    : theme.glyphColor,
-            backgroundColor: bgColor,
-          ),
-        ),
-      );
-    }
+    final spans = _buildWordSpans(
+      line: line,
+      fontFamily: fontFamily,
+      theme: theme,
+      fontSize: baseFontSize,
+      lineHeight: 1.05,
+      wordSpacing: -2.5,
+    );
 
     return SizedBox.expand(
       child: Align(
@@ -1320,4 +1418,52 @@ void _drawRosetteStar(
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9,
   );
+}
+
+/// Custom single-pointer gesture recognizer for [TextSpan] that recognizes both
+/// a short tap ([onTap]) and a long press ([onLongPress]), while rejecting
+/// immediately if the user drags/swipes (preserving smooth [PageView] swiping).
+class _WordTapAndLongPressRecognizer extends PrimaryPointerGestureRecognizer {
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  bool _longPressFired = false;
+
+  _WordTapAndLongPressRecognizer({
+    this.onTap,
+    this.onLongPress,
+  }) : super(deadline: kLongPressTimeout);
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _longPressFired = false;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void didExceedDeadline() {
+    if (onLongPress != null) {
+      _longPressFired = true;
+      resolve(GestureDisposition.accepted);
+      onLongPress!();
+    }
+  }
+
+  @override
+  void handlePrimaryPointer(PointerEvent event) {
+    if (event is PointerUpEvent) {
+      if (!_longPressFired) {
+        if (onTap != null) {
+          resolve(GestureDisposition.accepted);
+          onTap!();
+        } else {
+          resolve(GestureDisposition.rejected);
+        }
+      }
+    } else if (event is PointerCancelEvent) {
+      resolve(GestureDisposition.rejected);
+    }
+  }
+
+  @override
+  String get debugDescription => 'word tap and long press';
 }

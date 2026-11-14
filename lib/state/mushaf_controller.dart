@@ -411,10 +411,10 @@ class MushafController extends ChangeNotifier {
   }
 
   /// Completes the active Khatma at the end of the Quran (Surah An-Nas 114:6).
-  /// If [createIfNone] is true and no Khatma is currently active, starts a new
-  /// Khatma and immediately completes it at 114:6.
+  /// By default, returns `null` if no Khatma was started unless [createIfNone]
+  /// is explicitly set to `true` (e.g. after user confirmation).
   Future<KhatmaRecord?> completeActiveKhatma({
-    bool createIfNone = true,
+    bool createIfNone = false,
   }) async {
     var current = activeKhatma;
     if (current == null) {

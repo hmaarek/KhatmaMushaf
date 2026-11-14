@@ -144,6 +144,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _handleCompleteKhatmaFromLastPage(BuildContext context) async {
+    if (widget.controller.activeKhatma == null) {
+      final confirmed = await _showNoActiveKhatmaConfirmationDialog(context);
+      if (!context.mounted || !confirmed) return;
+    }
+
     final completed = await widget.controller.completeActiveKhatma(
       createIfNone: true,
     );
@@ -154,6 +159,85 @@ class _ReaderScreenState extends State<ReaderScreen> {
       khatma: completed,
       isJustCompletedCelebration: true,
     );
+  }
+
+  Future<bool> _showNoActiveKhatmaConfirmationDialog(
+    BuildContext context,
+  ) async {
+    final theme = widget.controller.theme;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: theme.pageBackground,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: theme.pageOuterBorder, width: 1.5),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: theme.ornamentPrimary,
+                  size: 26,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'لم يتم بدء ختمة جديدة',
+                    style: TextStyle(
+                      color: theme.glyphColor,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'لا توجد ختمة جارية حالياً، ولا يمكن إتمام ختمة لم يتم بدؤها مسبقاً.\n\nهل تؤكد إضافة ختمة جديدة الآن وإتمامها فوراً؟',
+              style: TextStyle(
+                color: theme.secondaryTextColor,
+                fontSize: 14.5,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2B8A62),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                label: const Text(
+                  'إضافة ختمة وإتمامها الآن',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    return result ?? false;
   }
 
   Future<void> _showAyahActionSheet(
@@ -321,6 +405,28 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             ),
                           ),
                           onPressed: () async {
+                            final isLastAyah = ayah.id >= 6236 ||
+                                (ayah.surahId == 114 && ayah.ayahNumber == 6);
+                            if (activeKhatma == null && isLastAyah) {
+                              Navigator.of(sheetCtx).pop();
+                              if (!context.mounted) return;
+                              final confirmed =
+                                  await _showNoActiveKhatmaConfirmationDialog(
+                                    context,
+                                  );
+                              if (!context.mounted || !confirmed) return;
+                              final completed = await widget.controller
+                                  .completeActiveKhatma(createIfNone: true);
+                              if (!context.mounted || completed == null) return;
+                              await showKhatmaReportModal(
+                                context,
+                                controller: widget.controller,
+                                khatma: completed,
+                                isJustCompletedCelebration: true,
+                              );
+                              return;
+                            }
+
                             final res =
                                 await widget.controller.markKhatmaAyah(ayah);
                             if (!sheetCtx.mounted) return;

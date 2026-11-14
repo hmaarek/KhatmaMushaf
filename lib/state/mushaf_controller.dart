@@ -8,6 +8,7 @@ import '../models/mushaf_models.dart';
 import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
 import '../services/khatma_service.dart';
+import '../services/smart_search_service.dart';
 import '../theme/mushaf_theme.dart';
 
 /// Controls how the 15-line Uthmani Mushaf page is sized/zoomed.
@@ -183,9 +184,10 @@ class MushafController extends ChangeNotifier {
     _isInitialized = true;
     notifyListeners();
 
-    // Preload slightly wider window in background
+    // Preload slightly wider window and smart search index in background
     unawaited(_dbService.preloadPages(_currentPage, radius: 2));
     unawaited(_fontLoader.preloadWindow(_currentPage, radius: 2));
+    unawaited(SmartSearchService.instance.ensureIndexed());
   }
 
   Future<void> _applyWakelock(bool enabled) async {
@@ -446,6 +448,10 @@ class MushafController extends ChangeNotifier {
 
   Future<List<AyahRecord>> searchAyahs(String query) {
     return _dbService.searchAyahs(query);
+  }
+
+  Future<SmartSearchResponse> smartSearchAyahs(String query) {
+    return SmartSearchService.instance.search(query);
   }
 
   @override

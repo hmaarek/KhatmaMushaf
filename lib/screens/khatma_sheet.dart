@@ -330,13 +330,29 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       ),
                     ],
                   ),
-                  Text(
-                    '${ArabicUtils.toArabicDigits(percent.toStringAsFixed(1))}٪',
-                    style: TextStyle(
-                      color: theme.ornamentPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '${ArabicUtils.toArabicDigits(percent.toStringAsFixed(1))}٪',
+                        style: TextStyle(
+                          color: theme.ornamentPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'حذف هذه الختمة',
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          color: theme.bookmarkRibbon,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            _confirmAndDeleteKhatma(context, khatma),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -844,7 +860,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       Icons.delete_outline_rounded,
                       color: theme.bookmarkRibbon,
                     ),
-                    onPressed: () => widget.controller.deleteKhatma(khatma.id),
+                    onPressed: () => _confirmAndDeleteKhatma(context, khatma),
                   ),
                 ],
               ),
@@ -853,6 +869,89 @@ class _KhatmaSheetState extends State<KhatmaSheet>
         );
       },
     );
+  }
+
+  Future<void> _confirmAndDeleteKhatma(
+    BuildContext context,
+    KhatmaRecord khatma,
+  ) async {
+    final theme = widget.controller.theme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: theme.pageBackground,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: theme.pageOuterBorder, width: 1.5),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: theme.bookmarkRibbon,
+                  size: 26,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'تأكيد حذف الختمة',
+                    style: TextStyle(
+                      color: theme.glyphColor,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'هل أنت متأكد من حذف «${khatma.title}» وسجلها بالكامل؟\n\nتنبيه: لا يمكن التراجع عن هذا الإجراء بعد الحذف.',
+              style: TextStyle(
+                color: theme.secondaryTextColor,
+                fontSize: 14.5,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.bookmarkRibbon,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                label: const Text(
+                  'تأكيد الحذف النهائي',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true && context.mounted) {
+      await widget.controller.deleteKhatma(khatma.id);
+    }
   }
 }
 

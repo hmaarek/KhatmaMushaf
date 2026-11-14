@@ -395,7 +395,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                 // 1. Top Ornamental Surah Header Banner (with floral rosettes & arabesque scrolls)
                 const SizedBox(height: 6.0),
                 SizedBox(
-                  height: 54 * fontScale.clamp(1.0, 1.22),
+                  height: 58 * fontScale.clamp(1.0, 1.22),
                   child: SurahHeaderBanner(
                     surahId: headerLine?.surahId ?? surahId,
                     headerText: headerLine?.headerText ?? '',
@@ -622,6 +622,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       child: Column(
         children: pageData.lines.map((line) {
           return Expanded(
+            flex: line.isSurahHeader ? 13 : 10,
             child: _buildStandardLineSlot(
               line,
               fontFamily,

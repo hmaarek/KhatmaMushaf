@@ -26,13 +26,13 @@ class SurahHeaderBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final clampedId = surahId.clamp(1, 114);
     // Direct PUA codepoint (0xE001..0xE072) mapped in assets/fonts/Surahs.ttf
-    // to glyph00003..glyph00116 (the full calligraphic "سُورَةُ ..." glyph).
+    // to the normalized full-height calligraphic "سُورَةُ ..." glyph.
     final surahCalligraphyChar = String.fromCharCode(0xE000 + clampedId);
 
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 2.0 : 4.0,
-        vertical: compact ? 1.0 : 2.0,
+        vertical: compact ? 0.5 : 1.5,
       ),
       child: CustomPaint(
         painter: _OpeningSurahBannerPainter(
@@ -44,23 +44,19 @@ class SurahHeaderBanner extends StatelessWidget {
         child: SizedBox.expand(
           child: Center(
             child: FractionallySizedBox(
-              widthFactor: 0.44,
+              widthFactor: 0.46,
+              heightFactor: 0.86,
               child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 6.0,
-                    vertical: compact ? 1.5 : 2.5,
-                  ),
-                  child: Text(
-                    surahCalligraphyChar,
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      fontFamily: 'Surahs',
-                      fontSize: compact ? 30 : 34,
-                      height: 1.0,
-                      color: theme.glyphColor,
-                    ),
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                child: Text(
+                  surahCalligraphyChar,
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(
+                    fontFamily: 'Surahs',
+                    fontSize: 64,
+                    height: 1.0,
+                    color: theme.glyphColor,
                   ),
                 ),
               ),
@@ -123,7 +119,7 @@ class _OpeningSurahBannerPainter extends CustomPainter {
     canvas.drawRRect(innerRRect, innerStroke);
 
     // 2. Central scalloped calligraphic cartouche (الجامة الوسطى لاسم السورة)
-    final cartoucheWidth = size.width * 0.45;
+    final cartoucheWidth = size.width * 0.50;
     final leftX = (size.width - cartoucheWidth) / 2;
     final rightX = leftX + cartoucheWidth;
     final topY = innerRect.top;

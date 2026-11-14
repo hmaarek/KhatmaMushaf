@@ -470,8 +470,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       fit: BoxFit.fitWidth,
       alignment: Alignment.center,
       child: Text(
-        'ﭑﭒﭓ',
-        textDirection: TextDirection.rtl,
+        '\uE000',
+        textDirection: TextDirection.ltr,
         style: TextStyle(
           fontFamily: 'QPC1BSML',
           fontSize: 40.0,
@@ -667,8 +667,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Text(
-          'ﭑﭒﭓ',
-          textDirection: TextDirection.rtl,
+          '\uE000',
+          textDirection: TextDirection.ltr,
           style: TextStyle(
             fontFamily: 'QPC1BSML',
             fontSize: fontSize,

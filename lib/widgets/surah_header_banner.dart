@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../models/mushaf_models.dart';
 import '../theme/mushaf_theme.dart';
-import '../utils/arabic_utils.dart';
 
 class SurahHeaderBanner extends StatelessWidget {
   final int surahId;
@@ -11,9 +10,6 @@ class SurahHeaderBanner extends StatelessWidget {
   final SurahInfo? surahInfo;
   final MushafThemeData theme;
   final bool compact;
-
-  /// When true (used on Pages 1 & 2), renders the classic floral rosette & arabesque
-  /// wings with a wide central calligraphic cartouche matching the traditional Mushaf opening.
   final bool openingSpreadStyle;
 
   const SurahHeaderBanner({
@@ -23,54 +19,15 @@ class SurahHeaderBanner extends StatelessWidget {
     required this.theme,
     this.surahInfo,
     this.compact = false,
-    this.openingSpreadStyle = false,
+    this.openingSpreadStyle = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final surahCode = surahId.toString().padLeft(3, '0');
-    final ayahCount = surahInfo?.ayahCount;
-    final revelationAr = surahInfo?.revelationArabic ?? '';
-
-    if (openingSpreadStyle) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
-        child: CustomPaint(
-          painter: _OpeningSurahBannerPainter(
-            primaryColor: theme.ornamentPrimary,
-            secondaryColor: theme.ornamentSecondary,
-            fillColor: theme.ornamentFill,
-            pageBackground: theme.pageBackground,
-          ),
-          child: SizedBox.expand(
-            child: Center(
-              child: FractionallySizedBox(
-                widthFactor: 0.44,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6.0,
-                      vertical: 3.0,
-                    ),
-                    child: Text(
-                      surahCode,
-                      textDirection: TextDirection.ltr,
-                      style: TextStyle(
-                        fontFamily: 'Surahs',
-                        fontSize: 34,
-                        height: 1.0,
-                        color: theme.glyphColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    final clampedId = surahId.clamp(1, 114);
+    // Direct PUA codepoint (0xE001..0xE072) mapped in assets/fonts/Surahs.ttf
+    // to glyph00003..glyph00116 (the full calligraphic "سُورَةُ ..." glyph).
+    final surahCalligraphyChar = String.fromCharCode(0xE000 + clampedId);
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -78,57 +35,35 @@ class SurahHeaderBanner extends StatelessWidget {
         vertical: compact ? 1.0 : 2.0,
       ),
       child: CustomPaint(
-        painter: _SurahBannerOrnamentPainter(
+        painter: _OpeningSurahBannerPainter(
           primaryColor: theme.ornamentPrimary,
           secondaryColor: theme.ornamentSecondary,
           fillColor: theme.ornamentFill,
           pageBackground: theme.pageBackground,
         ),
         child: SizedBox.expand(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Left rosette: Ayah count
-                _SideBadge(
-                  text: ayahCount != null
-                      ? 'آياتها ${ArabicUtils.toArabicDigits(ayahCount)}'
-                      : 'سورة',
-                  theme: theme,
-                ),
-                // Center cartouche: Calligraphic Surah title rendered with Surahs.ttf
-                Expanded(
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8.0,
-                          vertical: 2.0,
-                        ),
-                        child: Text(
-                          surahCode,
-                          textDirection: TextDirection.ltr,
-                          style: TextStyle(
-                            fontFamily: 'Surahs',
-                            fontSize: compact ? 24 : 28,
-                            height: 1.05,
-                            color: theme.glyphColor,
-                          ),
-                        ),
-                      ),
+          child: Center(
+            child: FractionallySizedBox(
+              widthFactor: 0.44,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: compact ? 1.5 : 2.5,
+                  ),
+                  child: Text(
+                    surahCalligraphyChar,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      fontFamily: 'Surahs',
+                      fontSize: compact ? 30 : 34,
+                      height: 1.0,
+                      color: theme.glyphColor,
                     ),
                   ),
                 ),
-                // Right rosette: Surah order & revelation place
-                _SideBadge(
-                  text: revelationAr.isNotEmpty
-                      ? '$revelationAr • ${ArabicUtils.toArabicDigits(surahId)}'
-                      : 'رقم ${ArabicUtils.toArabicDigits(surahId)}',
-                  theme: theme,
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -137,39 +72,8 @@ class SurahHeaderBanner extends StatelessWidget {
   }
 }
 
-class _SideBadge extends StatelessWidget {
-  final String text;
-  final MushafThemeData theme;
-
-  const _SideBadge({
-    required this.text,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 68,
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: theme.secondaryTextColor,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Ornate floral rosette & arabesque banner painter for Pages 1 & 2,
-/// modeled after the classic Mushaf Surah Al-Fatihah header banner.
+/// Ornate floral rosette & arabesque banner painter for all 114 Surah headers,
+/// modeled after the classic Mushaf Surah header banner.
 class _OpeningSurahBannerPainter extends CustomPainter {
   final Color primaryColor;
   final Color secondaryColor;
@@ -207,7 +111,7 @@ class _OpeningSurahBannerPainter extends CustomPainter {
       rect.deflate(1.0),
       const Radius.circular(6.0),
     );
-    final innerRect = rect.deflate(4.0);
+    final innerRect = rect.deflate(3.5);
     final innerRRect = RRect.fromRectAndRadius(
       innerRect,
       const Radius.circular(4.0),
@@ -219,39 +123,65 @@ class _OpeningSurahBannerPainter extends CustomPainter {
     canvas.drawRRect(innerRRect, innerStroke);
 
     // 2. Central scalloped calligraphic cartouche (الجامة الوسطى لاسم السورة)
-    final cartoucheWidth = size.width * 0.44;
+    final cartoucheWidth = size.width * 0.45;
     final leftX = (size.width - cartoucheWidth) / 2;
     final rightX = leftX + cartoucheWidth;
     final topY = innerRect.top;
     final bottomY = innerRect.bottom;
     final cy = size.height / 2;
-    final notch = (innerRect.height * 0.22).clamp(6.0, 12.0);
+    final notch = (innerRect.height * 0.22).clamp(5.0, 11.0);
 
     final cartouchePath = Path()
       ..moveTo(leftX + notch, topY)
       ..lineTo(rightX - notch, topY)
-      ..quadraticBezierTo(rightX - notch * 0.2, topY + notch * 0.8, rightX, topY + notch)
+      ..quadraticBezierTo(
+        rightX - notch * 0.2,
+        topY + notch * 0.8,
+        rightX,
+        topY + notch,
+      )
       ..lineTo(rightX, bottomY - notch)
-      ..quadraticBezierTo(rightX - notch * 0.2, bottomY - notch * 0.8, rightX - notch, bottomY)
+      ..quadraticBezierTo(
+        rightX - notch * 0.2,
+        bottomY - notch * 0.8,
+        rightX - notch,
+        bottomY,
+      )
       ..lineTo(leftX + notch, bottomY)
-      ..quadraticBezierTo(leftX + notch * 0.2, bottomY - notch * 0.8, leftX, bottomY - notch)
+      ..quadraticBezierTo(
+        leftX + notch * 0.2,
+        bottomY - notch * 0.8,
+        leftX,
+        bottomY - notch,
+      )
       ..lineTo(leftX, topY + notch)
-      ..quadraticBezierTo(leftX + notch * 0.2, topY + notch * 0.8, leftX + notch, topY)
+      ..quadraticBezierTo(
+        leftX + notch * 0.2,
+        topY + notch * 0.8,
+        leftX + notch,
+        topY,
+      )
       ..close();
 
     canvas.drawPath(cartouchePath, Paint()..color = pageBackground);
     canvas.drawPath(cartouchePath, outerStroke);
 
     // 3. Draw 12-petal floral rosette & symmetric arabesque scrolls in Left & Right wings
-    final leftWingCenter = Offset(innerRect.left + (leftX - innerRect.left) / 2, cy);
-    final rightWingCenter = Offset(rightX + (innerRect.right - rightX) / 2, cy);
-    final rosetteRadius = (innerRect.height * 0.36).clamp(8.0, 16.0);
+    final leftWingCenter = Offset(
+      innerRect.left + (leftX - innerRect.left) / 2,
+      cy,
+    );
+    final rightWingCenter = Offset(
+      rightX + (innerRect.right - rightX) / 2,
+      cy,
+    );
+    final rosetteRadius = (innerRect.height * 0.36).clamp(7.0, 15.0);
 
     for (final wingCenter in [leftWingCenter, rightWingCenter]) {
       _drawArabesqueScrolls(
         canvas,
         wingCenter,
-        (leftX - innerRect.left) * 0.44,
+        (leftX - innerRect.left) * 0.45,
         innerRect.height * 0.38,
         primaryColor,
         secondaryColor,
@@ -277,12 +207,12 @@ class _OpeningSurahBannerPainter extends CustomPainter {
   ) {
     const petals = 12;
     final petalFill = Paint()
-      ..color = bg.withValues(alpha: 0.9)
+      ..color = bg.withValues(alpha: 0.92)
       ..style = PaintingStyle.fill;
     final petalStroke = Paint()
       ..color = primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+      ..strokeWidth = 0.95;
 
     for (int i = 0; i < petals; i++) {
       final angle = (i * 2 * math.pi) / petals;
@@ -321,12 +251,12 @@ class _OpeningSurahBannerPainter extends CustomPainter {
     Color secondary,
   ) {
     final scrollStroke = Paint()
-      ..color = primary.withValues(alpha: 0.75)
+      ..color = primary.withValues(alpha: 0.78)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.15;
+      ..strokeWidth = 1.1;
 
     final leafFill = Paint()
-      ..color = secondary.withValues(alpha: 0.28)
+      ..color = secondary.withValues(alpha: 0.32)
       ..style = PaintingStyle.fill;
 
     for (final dirX in [-1.0, 1.0]) {
@@ -360,7 +290,7 @@ class _OpeningSurahBannerPainter extends CustomPainter {
             center.dx + dirX * (halfSpanX * 0.85),
             center.dy + dirY * (halfSpanY * 0.48),
           ),
-          2.2,
+          2.0,
           leafFill,
         );
       }
@@ -370,111 +300,6 @@ class _OpeningSurahBannerPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _OpeningSurahBannerPainter oldDelegate) {
     return oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.fillColor != fillColor ||
-        oldDelegate.pageBackground != pageBackground;
-  }
-}
-
-class _SurahBannerOrnamentPainter extends CustomPainter {
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color fillColor;
-  final Color pageBackground;
-
-  const _SurahBannerOrnamentPainter({
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.fillColor,
-    required this.pageBackground,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    if (rect.isEmpty) return;
-
-    final fillPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-
-    final outerStroke = Paint()
-      ..color = primaryColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-
-    final innerStroke = Paint()
-      ..color = secondaryColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
-
-    final rrect = RRect.fromRectAndRadius(
-      rect.deflate(1.0),
-      const Radius.circular(6.0),
-    );
-    canvas.drawRRect(rrect, fillPaint);
-    canvas.drawRRect(rrect, outerStroke);
-
-    final innerRRect = RRect.fromRectAndRadius(
-      rect.deflate(3.5),
-      const Radius.circular(4.0),
-    );
-    canvas.drawRRect(innerRRect, innerStroke);
-
-    // Draw side geometric medallions and center cartouche arches
-    final cy = size.height / 2;
-    const leftCx = 52.0;
-    final rightCx = size.width - 52.0;
-
-    for (final cx in [leftCx, rightCx]) {
-      if (cx > 16 && cx < size.width - 16) {
-        final badgeRect = Rect.fromCenter(
-          center: Offset(cx, cy),
-          width: 76,
-          height: (size.height - 8).clamp(10.0, 32.0),
-        );
-        final badgeRRect = RRect.fromRectAndRadius(
-          badgeRect,
-          Radius.circular(badgeRect.height / 2),
-        );
-        canvas.drawRRect(
-          badgeRRect,
-          Paint()..color = pageBackground.withValues(alpha: 0.7),
-        );
-        canvas.drawRRect(badgeRRect, innerStroke);
-      }
-    }
-
-    // Subtle eight-point star accents near left and right edges
-    _drawStar(canvas, Offset(10, cy), 4.5, primaryColor);
-    _drawStar(canvas, Offset(size.width - 10, cy), 4.5, primaryColor);
-  }
-
-  void _drawStar(Canvas canvas, Offset center, double radius, Color color) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    final path = Path();
-    const points = 8;
-    for (int i = 0; i < points * 2; i++) {
-      final r = i.isEven ? radius : radius * 0.45;
-      final angle = (i * math.pi) / points;
-      final x = center.dx + r * math.cos(angle);
-      final y = center.dy + r * math.sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SurahBannerOrnamentPainter oldDelegate) {
-    return oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.secondaryColor != secondaryColor ||
         oldDelegate.fillColor != fillColor ||
         oldDelegate.pageBackground != pageBackground;
   }

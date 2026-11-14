@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -323,7 +324,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
-  /// Pages 1 & 2 (Al-Fatihah & opening of Al-Baqarah) centered ornamental layout.
+  /// Pages 1 & 2 (Al-Fatihah & opening of Al-Baqarah) richly illuminated Madinah Mushaf layout.
   Widget _buildCenteredSpecialPage(
     MushafPageData pageData,
     MushafThemeData theme, {
@@ -333,73 +334,221 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     final fontFamily =
         QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
 
+    final surahId = pageData.info.firstSurahId;
+    final surahInfo = widget.controller.getSurahById(surahId);
+    final headerLine = pageData.lines.where((l) => l.isSurahHeader).firstOrNull;
+    final contentLines = pageData.lines
+        .where((l) => !l.isSurahHeader)
+        .toList(growable: false);
+
+    final surahTitleAr = surahInfo != null
+        ? 'سُورَةُ ${surahInfo.nameArabic}'
+        : (widget.pageNumber == 1 ? 'سُورَةُ الفَاتِحَةِ' : 'سُورَةُ البَقَرَةِ');
+    final revelationAr = surahInfo?.revelationArabic ??
+        (widget.pageNumber == 1 ? 'مكية' : 'مدنية');
+    final ayahCountAr = ArabicUtils.toArabicDigits(
+      surahInfo?.ayahCount ?? (widget.pageNumber == 1 ? 7 : 286),
+    );
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        return Center(
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: constraints.maxHeight * 0.82,
-              maxWidth: constraints.maxWidth * 0.98,
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8.0,
-              vertical: 12.0,
-            ),
-            decoration: BoxDecoration(
-              color: theme.pageBackground,
-              borderRadius: BorderRadius.circular(14.0),
-              border: Border.all(
-                color: theme.ornamentPrimary,
-                width: 2.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.ornamentPrimary.withValues(alpha: 0.08),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
+        return CustomPaint(
+          painter: _OpeningSpreadIlluminatedPainter(
+            primaryColor: theme.ornamentPrimary,
+            secondaryColor: theme.ornamentSecondary,
+            fillColor: theme.ornamentFill,
+            pageBackground: theme.pageBackground,
+            innerBorderColor: theme.pageInnerBorder,
+            isDark: theme.isDark,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22.0, 18.0, 22.0, 18.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: pageData.lines.map((line) {
-                if (line.isSurahHeader) {
-                  return SizedBox(
-                    height: 46 * fontScale.clamp(1.0, 1.25),
-                    child: SurahHeaderBanner(
-                      surahId: line.surahId ?? 1,
-                      headerText: line.headerText ?? '',
-                      surahInfo:
-                          widget.controller.getSurahById(line.surahId ?? 1),
-                      theme: theme,
+              children: [
+                // 1. Top Illuminated Crown & Surah Banner
+                _buildOpeningTopCrown(theme, widget.pageNumber),
+                const SizedBox(height: 6.0),
+                SizedBox(
+                  height: 50 * fontScale.clamp(1.0, 1.22),
+                  child: SurahHeaderBanner(
+                    surahId: headerLine?.surahId ?? surahId,
+                    headerText: headerLine?.headerText ?? '',
+                    surahInfo: surahInfo,
+                    theme: theme,
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+
+                // 2. Central Illuminated Medallion (الجامة الوسطى المزخرفة) containing the sacred verses
+                Expanded(
+                  child: CustomPaint(
+                    painter: _CentralMedallionFramePainter(
+                      primaryColor: theme.ornamentPrimary,
+                      secondaryColor: theme.ornamentSecondary,
+                      fillColor: theme.ornamentFill,
+                      pageBackground: theme.pageBackground,
                     ),
-                  );
-                } else if (line.isBasmala) {
-                  return SizedBox(
-                    height: 38 * fontScale.clamp(1.0, 1.25),
-                    child: _buildBasmalaLine(
-                      theme,
-                      fontSize: 30.0 * fontScale,
-                    ),
-                  );
-                } else {
-                  return Expanded(
-                    child: Center(
-                      child: _buildTextLine(
-                        line: line,
-                        fontFamily: fontFamily,
-                        theme: theme,
-                        centered: true,
-                        baseFontSize: 35.0 * fontScale,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 14.0,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: contentLines.map((line) {
+                          if (line.isBasmala) {
+                            return SizedBox(
+                              height: 38 * fontScale.clamp(1.0, 1.22),
+                              child: _buildBasmalaLine(
+                                theme,
+                                fontSize: 30.0 * fontScale,
+                              ),
+                            );
+                          }
+                          return Expanded(
+                            child: Center(
+                              child: _buildTextLine(
+                                line: line,
+                                fontFamily: fontFamily,
+                                theme: theme,
+                                centered: true,
+                                baseFontSize: 34.5 * fontScale,
+                              ),
+                            ),
+                          );
+                        }).toList(growable: false),
                       ),
                     ),
-                  );
-                }
-              }).toList(growable: false),
+                  ),
+                ),
+
+                const SizedBox(height: 8.0),
+                // 3. Bottom Illuminated Ornamental Cartouche & Floral Band
+                _buildOpeningBottomCartouche(
+                  theme: theme,
+                  surahTitleAr: surahTitleAr,
+                  revelationAr: revelationAr,
+                  ayahCountAr: ayahCountAr,
+                  juzAr: ArabicUtils.toArabicDigits(pageData.info.juzNumber),
+                ),
+                const SizedBox(height: 6.0),
+                _buildOpeningBottomCrown(theme),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildOpeningTopCrown(MushafThemeData theme, int pageNum) {
+    final label = pageNum == 1
+        ? '۞ فَاتِحَةُ الكِتَابِ الكَرِيمِ ۞'
+        : '۞ غُرَّةُ سُورَةِ البَقَرَةِ ۞';
+    return SizedBox(
+      height: 36,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _OrnamentalBandPainter(
+          primaryColor: theme.ornamentPrimary,
+          secondaryColor: theme.ornamentSecondary,
+          fillColor: theme.ornamentFill,
+          pageBackground: theme.pageBackground,
+          isTop: true,
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 36.0),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                textDirection: TextDirection.rtl,
+                style: TextStyle(
+                  color: theme.ornamentPrimary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOpeningBottomCartouche({
+    required MushafThemeData theme,
+    required String surahTitleAr,
+    required String revelationAr,
+    required String ayahCountAr,
+    required String juzAr,
+  }) {
+    return SizedBox(
+      height: 44,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _SurahFooterCartouchePainter(
+          primaryColor: theme.ornamentPrimary,
+          secondaryColor: theme.ornamentSecondary,
+          fillColor: theme.ornamentFill,
+          pageBackground: theme.pageBackground,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _OpeningCartoucheBadge(
+                  text: '$revelationAr',
+                  theme: theme,
+                ),
+                Expanded(
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(
+                          '$surahTitleAr  •  آيَاتُهَا $ayahCountAr',
+                          style: TextStyle(
+                            color: theme.glyphColor,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                _OpeningCartoucheBadge(
+                  text: 'الجُزْءُ $juzAr',
+                  theme: theme,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOpeningBottomCrown(MushafThemeData theme) {
+    return SizedBox(
+      height: 30,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _OrnamentalBandPainter(
+          primaryColor: theme.ornamentPrimary,
+          secondaryColor: theme.ornamentSecondary,
+          fillColor: theme.ornamentFill,
+          pageBackground: theme.pageBackground,
+          isTop: false,
+        ),
+      ),
     );
   }
 
@@ -770,4 +919,558 @@ class _BookmarkRibbonPainter extends CustomPainter {
   bool shouldRepaint(covariant _BookmarkRibbonPainter oldDelegate) {
     return oldDelegate.color != color;
   }
+}
+
+class _OpeningCartoucheBadge extends StatelessWidget {
+  final String text;
+  final MushafThemeData theme;
+
+  const _OpeningCartoucheBadge({
+    required this.text,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 68,
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: theme.secondaryTextColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Richly illuminated border and geometric lattice painter for Pages 1 & 2
+/// (Al-Fatihah and the opening of Al-Baqarah).
+class _OpeningSpreadIlluminatedPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color fillColor;
+  final Color pageBackground;
+  final Color innerBorderColor;
+  final bool isDark;
+
+  const _OpeningSpreadIlluminatedPainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.fillColor,
+    required this.pageBackground,
+    required this.innerBorderColor,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    if (rect.isEmpty) return;
+
+    // 1. Outer illuminated band fill
+    final outerRect = rect.deflate(2.0);
+    final innerClearRect = rect.deflate(14.0);
+
+    final bandPaint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
+
+    final outerRRect = RRect.fromRectAndRadius(
+      outerRect,
+      const Radius.circular(10.0),
+    );
+    final innerClearRRect = RRect.fromRectAndRadius(
+      innerClearRect,
+      const Radius.circular(8.0),
+    );
+
+    final borderBandPath = Path()
+      ..addRRect(outerRRect)
+      ..addRRect(innerClearRRect)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(borderBandPath, bandPaint);
+
+    // 2. Triple stroke lines around the illuminated border band
+    final thickGoldStroke = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final thinGoldStroke = Paint()
+      ..color = secondaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    canvas.drawRRect(outerRRect, thickGoldStroke);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(5.0), const Radius.circular(8.5)),
+      thinGoldStroke,
+    );
+    canvas.drawRRect(innerClearRRect, thickGoldStroke);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(17.0), const Radius.circular(6.5)),
+      thinGoldStroke,
+    );
+
+    // 3. Repeating geometric diamond/star chain along top, bottom, left, and right borders
+    final dotFill = Paint()
+      ..color = primaryColor.withValues(alpha: 0.75)
+      ..style = PaintingStyle.fill;
+    final chainStroke = Paint()
+      ..color = primaryColor.withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9;
+
+    const step = 22.0;
+    // Top & Bottom border bands
+    for (double x = 28.0; x < size.width - 28.0; x += step) {
+      _drawSmallDiamond(canvas, Offset(x, 8.0), 3.6, chainStroke, dotFill);
+      _drawSmallDiamond(
+        canvas,
+        Offset(x, size.height - 8.0),
+        3.6,
+        chainStroke,
+        dotFill,
+      );
+    }
+
+    // Left & Right border bands
+    for (double y = 32.0; y < size.height - 32.0; y += step) {
+      _drawSmallDiamond(canvas, Offset(8.0, y), 3.6, chainStroke, dotFill);
+      _drawSmallDiamond(
+        canvas,
+        Offset(size.width - 8.0, y),
+        3.6,
+        chainStroke,
+        dotFill,
+      );
+    }
+
+    // 4. Four Corner Shamsa Rosettes (شمسات الأركان الأربعة)
+    final corners = [
+      const Offset(13.0, 13.0),
+      Offset(size.width - 13.0, 13.0),
+      Offset(13.0, size.height - 13.0),
+      Offset(size.width - 13.0, size.height - 13.0),
+    ];
+    for (final c in corners) {
+      _drawRosetteStar(
+        canvas,
+        c,
+        10.5,
+        primaryColor,
+        secondaryColor,
+        pageBackground,
+      );
+    }
+
+    // 5. Mid-Side Medallions (شمسات منتصف الصفحة يميناً ويساراً)
+    final midY = size.height / 2;
+    _drawRosetteStar(
+      canvas,
+      Offset(10.0, midY),
+      9.5,
+      primaryColor,
+      secondaryColor,
+      fillColor,
+    );
+    _drawRosetteStar(
+      canvas,
+      Offset(size.width - 10.0, midY),
+      9.5,
+      primaryColor,
+      secondaryColor,
+      fillColor,
+    );
+  }
+
+  void _drawSmallDiamond(
+    Canvas canvas,
+    Offset center,
+    double r,
+    Paint stroke,
+    Paint fill,
+  ) {
+    final path = Path()
+      ..moveTo(center.dx, center.dy - r)
+      ..lineTo(center.dx + r, center.dy)
+      ..lineTo(center.dx, center.dy + r)
+      ..lineTo(center.dx - r, center.dy)
+      ..close();
+    canvas.drawPath(path, stroke);
+    canvas.drawCircle(center, 1.2, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _OpeningSpreadIlluminatedPainter oldDelegate) {
+    return oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.pageBackground != pageBackground;
+  }
+}
+
+/// Draws the ornate scalloped Islamic Mihrab/Medallion around the centered verses
+/// on Pages 1 & 2, with corner arabesque quarter-rosettes.
+class _CentralMedallionFramePainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color fillColor;
+  final Color pageBackground;
+
+  const _CentralMedallionFramePainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.fillColor,
+    required this.pageBackground,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    if (rect.isEmpty) return;
+
+    // Outer tinted medallion frame
+    final outerRRect = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(18.0),
+    );
+    final innerRRect = RRect.fromRectAndRadius(
+      rect.deflate(6.0),
+      const Radius.circular(14.0),
+    );
+
+    // Fill the 6px frame ring with ornamentFill
+    final ringPath = Path()
+      ..addRRect(outerRRect)
+      ..addRRect(innerRRect)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(
+      ringPath,
+      Paint()
+        ..color = fillColor
+        ..style = PaintingStyle.fill,
+    );
+
+    // Fill center with pageBackground
+    canvas.drawRRect(
+      innerRRect,
+      Paint()
+        ..color = pageBackground
+        ..style = PaintingStyle.fill,
+    );
+
+    final outerStroke = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final innerStroke = Paint()
+      ..color = secondaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    canvas.drawRRect(outerRRect, outerStroke);
+    canvas.drawRRect(innerRRect, innerStroke);
+
+    // Inner chamfered/scalloped corner arches (الزوايا المحرابية الأربع)
+    final archStroke = Paint()
+      ..color = primaryColor.withValues(alpha: 0.65)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final archFill = Paint()
+      ..color = fillColor.withValues(alpha: 0.85)
+      ..style = PaintingStyle.fill;
+
+    const cornerRadius = 24.0;
+    final innerBounds = rect.deflate(6.0);
+    canvas.save();
+    canvas.clipRRect(innerRRect);
+
+    final innerCorners = [
+      innerBounds.topLeft,
+      innerBounds.topRight,
+      innerBounds.bottomLeft,
+      innerBounds.bottomRight,
+    ];
+    for (final c in innerCorners) {
+      canvas.drawCircle(c, cornerRadius, archFill);
+      canvas.drawCircle(c, cornerRadius, archStroke);
+      canvas.drawCircle(c, cornerRadius * 0.62, archStroke);
+    }
+    canvas.restore();
+
+    // Top & Bottom center crown medallions on the medallion frame
+    _drawRosetteStar(
+      canvas,
+      Offset(size.width / 2, 3.0),
+      7.5,
+      primaryColor,
+      secondaryColor,
+      pageBackground,
+    );
+    _drawRosetteStar(
+      canvas,
+      Offset(size.width / 2, size.height - 3.0),
+      7.5,
+      primaryColor,
+      secondaryColor,
+      pageBackground,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CentralMedallionFramePainter oldDelegate) {
+    return oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.pageBackground != pageBackground;
+  }
+}
+
+/// Ornamental top & bottom crown bands on Pages 1 & 2.
+class _OrnamentalBandPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color fillColor;
+  final Color pageBackground;
+  final bool isTop;
+
+  const _OrnamentalBandPainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.fillColor,
+    required this.pageBackground,
+    required this.isTop,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    if (rect.isEmpty) return;
+
+    final rrect = RRect.fromRectAndRadius(
+      rect.deflate(1.0),
+      const Radius.circular(8.0),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = fillColor
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = primaryColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(3.5), const Radius.circular(6.0)),
+      Paint()
+        ..color = secondaryColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8,
+    );
+
+    final cy = size.height / 2;
+    // Draw twin rosette stars on left & right of the crown band
+    _drawRosetteStar(
+      canvas,
+      Offset(18.0, cy),
+      7.5,
+      primaryColor,
+      secondaryColor,
+      pageBackground,
+    );
+    _drawRosetteStar(
+      canvas,
+      Offset(size.width - 18.0, cy),
+      7.5,
+      primaryColor,
+      secondaryColor,
+      pageBackground,
+    );
+
+    if (!isTop) {
+      // On bottom crown band, draw a row of ornamental 8-point stars across the center
+      final count = ((size.width - 80) / 36).floor().clamp(3, 9);
+      final totalSpan = (count - 1) * 34.0;
+      final startX = (size.width - totalSpan) / 2;
+      for (int i = 0; i < count; i++) {
+        final isCenter = i == count ~/ 2;
+        _drawRosetteStar(
+          canvas,
+          Offset(startX + i * 34.0, cy),
+          isCenter ? 8.5 : 6.0,
+          primaryColor,
+          secondaryColor,
+          pageBackground,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrnamentalBandPainter oldDelegate) {
+    return oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.isTop != isTop;
+  }
+}
+
+/// Ornamental bottom Surah info cartouche on Pages 1 & 2.
+class _SurahFooterCartouchePainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color fillColor;
+  final Color pageBackground;
+
+  const _SurahFooterCartouchePainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.fillColor,
+    required this.pageBackground,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    if (rect.isEmpty) return;
+
+    final rrect = RRect.fromRectAndRadius(
+      rect.deflate(1.0),
+      const Radius.circular(8.0),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = fillColor
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = primaryColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(3.5), const Radius.circular(5.5)),
+      Paint()
+        ..color = secondaryColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8,
+    );
+
+    final cy = size.height / 2;
+    for (final cx in [52.0, size.width - 52.0]) {
+      if (cx > 16 && cx < size.width - 16) {
+        final badgeRect = Rect.fromCenter(
+          center: Offset(cx, cy),
+          width: 72,
+          height: (size.height - 10).clamp(12.0, 28.0),
+        );
+        final badgeRRect = RRect.fromRectAndRadius(
+          badgeRect,
+          Radius.circular(badgeRect.height / 2),
+        );
+        canvas.drawRRect(
+          badgeRRect,
+          Paint()..color = pageBackground.withValues(alpha: 0.78),
+        );
+        canvas.drawRRect(
+          badgeRRect,
+          Paint()
+            ..color = secondaryColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 0.9,
+        );
+      }
+    }
+
+    _drawRosetteStar(
+      canvas,
+      Offset(11.0, cy),
+      5.0,
+      primaryColor,
+      secondaryColor,
+      pageBackground,
+    );
+    _drawRosetteStar(
+      canvas,
+      Offset(size.width - 11.0, cy),
+      5.0,
+      primaryColor,
+      secondaryColor,
+      pageBackground,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SurahFooterCartouchePainter oldDelegate) {
+    return oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.fillColor != fillColor;
+  }
+}
+
+void _drawRosetteStar(
+  Canvas canvas,
+  Offset center,
+  double radius,
+  Color primaryColor,
+  Color secondaryColor,
+  Color centerFillColor,
+) {
+  final path = Path();
+  const points = 8;
+  for (int i = 0; i < points * 2; i++) {
+    final r = i.isEven ? radius : radius * 0.52;
+    final angle = (i * math.pi) / points;
+    final x = center.dx + r * math.cos(angle);
+    final y = center.dy + r * math.sin(angle);
+    if (i == 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.close();
+
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = secondaryColor.withValues(alpha: 0.35)
+      ..style = PaintingStyle.fill,
+  );
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1,
+  );
+  canvas.drawCircle(
+    center,
+    radius * 0.32,
+    Paint()
+      ..color = centerFillColor
+      ..style = PaintingStyle.fill,
+  );
+  canvas.drawCircle(
+    center,
+    radius * 0.32,
+    Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9,
+  );
 }

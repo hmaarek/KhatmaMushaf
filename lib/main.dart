@@ -35,7 +35,7 @@ class MushafApp extends StatelessWidget {
         builder: (context, ctrl, _) {
           final theme = ctrl.theme;
           return MaterialApp(
-            title: 'المصحف الشريف - Mushaf',
+            title: 'مصحف الختمة - Khatma Mushaf',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
               useMaterial3: true,

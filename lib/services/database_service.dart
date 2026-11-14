@@ -175,6 +175,21 @@ class DatabaseService {
     return AyahRecord.fromMap(rows.first);
   }
 
+  /// Fetches all [LineWord] items belonging to [verseKey] (e.g. `"2:255"`) ordered by appearance.
+  Future<List<LineWord>> getWordsForVerseKey(String verseKey) async {
+    final db = await database;
+    final rows = await db.query(
+      'line_words',
+      where: 'verse_key = ?',
+      whereArgs: [verseKey],
+      orderBy: 'id ASC',
+    );
+    return rows
+        .map(LineWord.fromMap)
+        .where((w) => !w.isStandaloneVerseMarker)
+        .toList(growable: false);
+  }
+
   /// Offline Arabic search using stripped/diacritic-free Uthmani text (`text_clean`).
   Future<List<AyahRecord>> searchAyahs(String rawQuery, {int limit = 100}) async {
     final normalized = ArabicUtils.normalizeForSearch(rawQuery);

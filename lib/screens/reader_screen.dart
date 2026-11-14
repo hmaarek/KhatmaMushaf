@@ -7,6 +7,7 @@ import '../state/mushaf_controller.dart';
 import '../utils/arabic_utils.dart';
 import '../widgets/mushaf_page_widget.dart';
 import '../widgets/reader_hud_overlay.dart';
+import 'ayah_explanation_sheet.dart';
 import 'bookmarks_sheet.dart';
 import 'index_sheet.dart';
 import 'khatma_sheet.dart';
@@ -473,6 +474,42 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.ornamentPrimary,
+                      side: BorderSide(color: theme.ornamentPrimary),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () {
+                      showAyahExplanationSheet(
+                        context,
+                        controller: widget.controller,
+                        verseKey: '$surahId:$ayahNum',
+                        initialWord: activeWord,
+                        initialTabIndex: activeWord != null ? 0 : 1,
+                      );
+                    },
+                    icon: const Icon(Icons.menu_book_rounded, size: 17),
+                    label: const Text(
+                      'المعنى والتفسير',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
                   InkWell(
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => widget.controller.setAutoPlayAyahAfterWord(
@@ -481,7 +518,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 7,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
                         color: widget.controller.autoPlayAyahAfterWord
@@ -501,14 +538,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             widget.controller.autoPlayAyahAfterWord
                                 ? Icons.check_circle_rounded
                                 : Icons.playlist_play_rounded,
-                            size: 16,
+                            size: 15,
                             color: widget.controller.autoPlayAyahAfterWord
                                 ? const Color(0xFF2B8A62)
                                 : theme.secondaryTextColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'تلاوة الآية تلقائياً',
+                            'تشغيل تلاوة الآية كاملة تلقائياً بعد نطق الكلمة (${widget.controller.selectedReciter.shortArabicName})',
                             style: TextStyle(
                               color: widget.controller.autoPlayAyahAfterWord
                                   ? const Color(0xFF2B8A62)
@@ -927,7 +964,43 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
+
+                      // Ayah Explanation Button (Word Meanings + Summary + Detailed Tafsir)
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.ornamentPrimary,
+                          backgroundColor:
+                              theme.ornamentPrimary.withValues(alpha: 0.08),
+                          side: BorderSide(
+                            color: theme.ornamentPrimary,
+                            width: 1.4,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(sheetCtx).pop();
+                          showAyahExplanationSheet(
+                            context,
+                            controller: widget.controller,
+                            verseKey: ayah.verseKey,
+                            initialWord: tappedWord,
+                            initialTabIndex: tappedWord != null &&
+                                    !tappedWord.isStandaloneVerseMarker
+                                ? 0
+                                : 1,
+                          );
+                        },
+                        icon: const Icon(Icons.menu_book_rounded, size: 20),
+                        label: const Text(
+                          'معاني الكلمات وتفسير الآية (المختصر والتفصيلي)',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
 
                       // Khatma Progress Mark Button (Set or Delete/Rollback)
                       if (isCurrentKhatmaMark)

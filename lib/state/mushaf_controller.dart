@@ -62,6 +62,8 @@ class MushafController extends ChangeNotifier {
   static const String _prefThemeIndex = 'mushaf_theme_index';
   static const String _prefFontScaleModeIndex = 'mushaf_font_scale_mode_index';
   static const String _prefKeepScreenAwake = 'mushaf_keep_screen_awake';
+  static const String _prefShowLastPageKhatmaButton =
+      'mushaf_show_last_page_khatma_button';
 
   final DatabaseService _dbService = DatabaseService.instance;
   final QpcFontLoaderService _fontLoader = QpcFontLoaderService.instance;
@@ -75,6 +77,7 @@ class MushafController extends ChangeNotifier {
   MushafThemeType _themeType = MushafThemeType.warmPaper;
   MushafFontScaleMode _fontScaleMode = MushafFontScaleMode.standard;
   bool _keepScreenAwake = true;
+  bool _showLastPageKhatmaButton = true;
   bool _isHudVisible = false;
   String? _selectedVerseKey;
 
@@ -91,6 +94,7 @@ class MushafController extends ChangeNotifier {
   MushafThemeData get theme => MushafThemeData.fromType(_themeType);
   MushafFontScaleMode get fontScaleMode => _fontScaleMode;
   bool get keepScreenAwake => _keepScreenAwake;
+  bool get showLastPageKhatmaButton => _showLastPageKhatmaButton;
   bool get isHudVisible => _isHudVisible;
   String? get selectedVerseKey => _selectedVerseKey;
   List<SurahInfo> get surahs => _surahs;
@@ -149,11 +153,14 @@ class MushafController extends ChangeNotifier {
     final savedScaleIdx = (_prefs?.getInt(_prefFontScaleModeIndex) ?? 0)
         .clamp(0, MushafFontScaleMode.values.length - 1);
     final savedWake = _prefs?.getBool(_prefKeepScreenAwake) ?? true;
+    final savedShowKhatmaBtn =
+        _prefs?.getBool(_prefShowLastPageKhatmaButton) ?? true;
 
     _currentPage = savedPage;
     _themeType = MushafThemeType.values[savedThemeIdx];
     _fontScaleMode = MushafFontScaleMode.values[savedScaleIdx];
     _keepScreenAwake = savedWake;
+    _showLastPageKhatmaButton = savedShowKhatmaBtn;
     _pageController = PageController(initialPage: _currentPage - 1);
 
     await _applyWakelock(_keepScreenAwake);
@@ -307,6 +314,13 @@ class MushafController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setShowLastPageKhatmaButton(bool value) {
+    if (_showLastPageKhatmaButton == value) return;
+    _showLastPageKhatmaButton = value;
+    _prefs?.setBool(_prefShowLastPageKhatmaButton, value);
+    notifyListeners();
+  }
+
   void cycleTheme() {
     final nextIndex = (_themeType.index + 1) % MushafThemeType.values.length;
     setTheme(MushafThemeType.values[nextIndex]);
@@ -397,11 +411,19 @@ class MushafController extends ChangeNotifier {
   }
 
   /// Completes the active Khatma at the end of the Quran (Surah An-Nas 114:6).
-  Future<KhatmaRecord?> completeActiveKhatma() async {
-    final current = activeKhatma;
-    if (current == null) return null;
+  /// If [createIfNone] is true and no Khatma is currently active, starts a new
+  /// Khatma and immediately completes it at 114:6.
+  Future<KhatmaRecord?> completeActiveKhatma({
+    bool createIfNone = true,
+  }) async {
+    var current = activeKhatma;
+    if (current == null) {
+      if (!createIfNone) return null;
+      current = await _khatmaService.startNewKhatma();
+    }
     final completed = await _khatmaService.completeKhatmaAtEnd(current.id);
     _khatmas = await _khatmaService.getAllKhatmas();
+    _selectedVerseKey = null;
     notifyListeners();
     return completed;
   }

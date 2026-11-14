@@ -94,6 +94,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           },
                           onAyahLongPress: (verseKey) =>
                               _showAyahActionSheet(context, verseKey),
+                          onCompleteKhatmaTap: () =>
+                              _handleCompleteKhatmaFromLastPage(context),
                         );
                       },
                     ),
@@ -138,6 +140,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => sheet,
+    );
+  }
+
+  Future<void> _handleCompleteKhatmaFromLastPage(BuildContext context) async {
+    final completed = await widget.controller.completeActiveKhatma(
+      createIfNone: true,
+    );
+    if (!context.mounted || completed == null) return;
+    await showKhatmaReportModal(
+      context,
+      controller: widget.controller,
+      khatma: completed,
+      isJustCompletedCelebration: true,
     );
   }
 

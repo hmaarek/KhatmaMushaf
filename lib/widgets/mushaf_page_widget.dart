@@ -14,6 +14,7 @@ class MushafPageWidget extends StatefulWidget {
   final VoidCallback onCenterTap;
   final ValueChanged<String> onAyahLongPress;
   final ValueChanged<bool>? onZoomChanged;
+  final VoidCallback? onCompleteKhatmaTap;
 
   const MushafPageWidget({
     super.key,
@@ -22,6 +23,7 @@ class MushafPageWidget extends StatefulWidget {
     required this.onCenterTap,
     required this.onAyahLongPress,
     this.onZoomChanged,
+    this.onCompleteKhatmaTap,
   });
 
   @override
@@ -253,6 +255,12 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                           fontScale: fontScale,
                         ),
                 ),
+                // Special Khatma Completion button on the very last page of the Mushaf (Page 604, after Surah An-Nas Ayah 6)
+                if (info.pageNumber == 604 &&
+                    widget.controller.showLastPageKhatmaButton) ...[
+                  const SizedBox(height: 4.0),
+                  _buildLastPageKhatmaCompletionButton(theme),
+                ],
                 const SizedBox(height: 2.0),
                 // Bottom page number in ornamental cartouche
                 _buildFooterPageNumber(info.pageNumber, theme),
@@ -535,6 +543,98 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               textAlign: TextAlign.center,
               maxLines: 1,
               text: TextSpan(children: spans),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLastPageKhatmaCompletionButton(MushafThemeData theme) {
+    final activeKhatma = widget.controller.activeKhatma;
+    final serialLabel = activeKhatma != null
+        ? 'الختمة #${ArabicUtils.toArabicDigits(activeKhatma.serialNumber)}'
+        : 'الختمة القرآنية';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onCompleteKhatmaTap,
+          borderRadius: BorderRadius.circular(12.0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14.0,
+              vertical: 8.0,
+            ),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF1F7A53),
+                  Color(0xFF2B8A62),
+                ],
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+              ),
+              borderRadius: BorderRadius.circular(12.0),
+              border: Border.all(
+                color: theme.ornamentPrimary,
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2B8A62).withValues(alpha: 0.28),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Color(0xFFFFD56B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'إتمام $serialLabel وعرض التقرير',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'صدق الله العظيم',
+                      style: TextStyle(
+                        color: Color(0xFFFFF3D1),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

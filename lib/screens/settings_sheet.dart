@@ -243,7 +243,42 @@ class SettingsSheet extends StatelessWidget {
                           ),
 
                           const SizedBox(height: 18),
-                          // Section 3: Keep Screen Awake toggle
+                          // Section 3: Last Page Khatma Completion Button toggle
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.ornamentFill,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.pageInnerBorder),
+                            ),
+                            child: SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              activeThumbColor: const Color(0xFF2B8A62),
+                              value: controller.showLastPageKhatmaButton,
+                              onChanged: controller.setShowLastPageKhatmaButton,
+                              title: Text(
+                                'زر إتمام الختمة في آخر صفحة',
+                                style: TextStyle(
+                                  color: theme.glyphColor,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'إظهار زر خاص أسفل سورة الناس (بعد الآية ٦ في صفحة ٦٠٤) لإتمام الختمة وعرض التقرير',
+                                style: TextStyle(
+                                  color: theme.secondaryTextColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+                          // Section 4: Keep Screen Awake toggle
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,

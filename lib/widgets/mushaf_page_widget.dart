@@ -324,7 +324,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
-  /// Pages 1 & 2 (Al-Fatihah & opening of Al-Baqarah) richly illuminated Madinah Mushaf layout.
+  /// Pages 1 & 2 (Al-Fatihah & opening of Al-Baqarah) circular text form & illuminated layout.
   Widget _buildCenteredSpecialPage(
     MushafPageData pageData,
     MushafThemeData theme, {
@@ -341,6 +341,29 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         .where((l) => !l.isSurahHeader)
         .toList(growable: false);
 
+    // Circular chord width profile for the 7 lines of Page 1 (Al-Fatihah)
+    // and Page 2 (opening of Al-Baqarah), forming the classic circular/oval silhouette.
+    const page1ChordFactors = <double>[
+      0.52,
+      0.74,
+      0.94,
+      1.00,
+      0.91,
+      0.70,
+      0.42,
+    ];
+    const page2ChordFactors = <double>[
+      0.54,
+      0.76,
+      0.94,
+      1.00,
+      0.93,
+      0.76,
+      0.52,
+    ];
+    final chordProfile =
+        widget.pageNumber == 1 ? page1ChordFactors : page2ChordFactors;
+
     final surahTitleAr = surahInfo != null
         ? 'سُورَةُ ${surahInfo.nameArabic}'
         : (widget.pageNumber == 1 ? 'سُورَةُ الفَاتِحَةِ' : 'سُورَةُ البَقَرَةِ');
@@ -352,6 +375,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final availableInnerWidth =
+            (constraints.maxWidth - 48.0).clamp(180.0, 600.0);
+        final circleMaxWidth = availableInnerWidth * 0.94;
+
         return CustomPaint(
           painter: _OpeningSpreadIlluminatedPainter(
             primaryColor: theme.ornamentPrimary,
@@ -362,68 +389,66 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             isDark: theme.isDark,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(22.0, 18.0, 22.0, 18.0),
+            padding: const EdgeInsets.fromLTRB(20.0, 18.0, 20.0, 18.0),
             child: Column(
               children: [
-                // 1. Top Illuminated Crown & Surah Banner
-                _buildOpeningTopCrown(theme, widget.pageNumber),
+                // 1. Top Ornamental Surah Header Banner (with floral rosettes & arabesque scrolls)
                 const SizedBox(height: 6.0),
                 SizedBox(
-                  height: 50 * fontScale.clamp(1.0, 1.22),
+                  height: 54 * fontScale.clamp(1.0, 1.22),
                   child: SurahHeaderBanner(
                     surahId: headerLine?.surahId ?? surahId,
                     headerText: headerLine?.headerText ?? '',
                     surahInfo: surahInfo,
                     theme: theme,
+                    openingSpreadStyle: true,
                   ),
                 ),
-                const SizedBox(height: 8.0),
 
-                // 2. Central Illuminated Medallion (الجامة الوسطى المزخرفة) containing the sacred verses
+                // 2. Vertically centered Circular Verse Block (النص القرآني بالتنسيق الدائري)
                 Expanded(
-                  child: CustomPaint(
-                    painter: _CentralMedallionFramePainter(
-                      primaryColor: theme.ornamentPrimary,
-                      secondaryColor: theme.ornamentSecondary,
-                      fillColor: theme.ornamentFill,
-                      pageBackground: theme.pageBackground,
-                    ),
+                  child: Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 14.0,
+                        horizontal: 4.0,
+                        vertical: 8.0,
                       ),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: contentLines.map((line) {
-                          if (line.isBasmala) {
-                            return SizedBox(
-                              height: 38 * fontScale.clamp(1.0, 1.22),
-                              child: _buildBasmalaLine(
-                                theme,
-                                fontSize: 30.0 * fontScale,
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List<Widget>.generate(
+                          contentLines.length,
+                          (idx) {
+                            final line = contentLines[idx];
+                            final factor = idx < chordProfile.length
+                                ? chordProfile[idx]
+                                : 0.75;
+                            final targetLineWidth = circleMaxWidth * factor;
+
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 4.5),
+                              child: Center(
+                                child: SizedBox(
+                                  width: targetLineWidth,
+                                  child: line.isBasmala
+                                      ? _buildCircularBasmalaLine(theme)
+                                      : _buildCircularTextLine(
+                                          line: line,
+                                          fontFamily: fontFamily,
+                                          theme: theme,
+                                        ),
+                                ),
                               ),
                             );
-                          }
-                          return Expanded(
-                            child: Center(
-                              child: _buildTextLine(
-                                line: line,
-                                fontFamily: fontFamily,
-                                theme: theme,
-                                centered: true,
-                                baseFontSize: 34.5 * fontScale,
-                              ),
-                            ),
-                          );
-                        }).toList(growable: false),
+                          },
+                        ),
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 8.0),
-                // 3. Bottom Illuminated Ornamental Cartouche & Floral Band
+                // 3. Subtle Bottom Ornamental Surah Info Cartouche
                 _buildOpeningBottomCartouche(
                   theme: theme,
                   surahTitleAr: surahTitleAr,
@@ -431,8 +456,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                   ayahCountAr: ayahCountAr,
                   juzAr: ArabicUtils.toArabicDigits(pageData.info.juzNumber),
                 ),
-                const SizedBox(height: 6.0),
-                _buildOpeningBottomCrown(theme),
+                const SizedBox(height: 4.0),
               ],
             ),
           ),
@@ -441,38 +465,85 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
-  Widget _buildOpeningTopCrown(MushafThemeData theme, int pageNum) {
-    final label = pageNum == 1
-        ? '۞ فَاتِحَةُ الكِتَابِ الكَرِيمِ ۞'
-        : '۞ غُرَّةُ سُورَةِ البَقَرَةِ ۞';
-    return SizedBox(
-      height: 36,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _OrnamentalBandPainter(
-          primaryColor: theme.ornamentPrimary,
-          secondaryColor: theme.ornamentSecondary,
-          fillColor: theme.ornamentFill,
-          pageBackground: theme.pageBackground,
-          isTop: true,
+  Widget _buildCircularBasmalaLine(MushafThemeData theme) {
+    return FittedBox(
+      fit: BoxFit.fitWidth,
+      alignment: Alignment.center,
+      child: Text(
+        'ﭑﭒﭓ',
+        textDirection: TextDirection.rtl,
+        style: TextStyle(
+          fontFamily: 'QPC1BSML',
+          fontSize: 40.0,
+          height: 1.05,
+          color: theme.glyphColor,
         ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 36.0),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  color: theme.ornamentPrimary,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ),
+      ),
+    );
+  }
+
+  Widget _buildCircularTextLine({
+    required MushafPageLine line,
+    required String fontFamily,
+    required MushafThemeData theme,
+  }) {
+    final selectedVerse = widget.controller.selectedVerseKey;
+    final spans = <InlineSpan>[];
+
+    for (int i = 0; i < line.words.length; i++) {
+      final word = line.words[i];
+      final isSelected = selectedVerse == word.verseKey;
+      final isKhatmaMark =
+          widget.controller.isKhatmaCurrentVerse(word.verseKey);
+      final isBookmarkedAyah =
+          widget.controller.isAyahBookmarked(word.verseKey);
+
+      final recognizer = LongPressGestureRecognizer()
+        ..onLongPress = () {
+          widget.controller.selectVerse(word.verseKey);
+          widget.onAyahLongPress(word.verseKey);
+        };
+      _recognizers.add(recognizer);
+
+      Color? bgColor;
+      if (isSelected) {
+        bgColor = theme.ayahHighlightFill;
+      } else if (isKhatmaMark) {
+        bgColor = const Color(0x3D2B8A62);
+      } else if (isBookmarkedAyah) {
+        bgColor = theme.ayahHighlightFill.withValues(alpha: 0.14);
+      }
+
+      spans.add(
+        TextSpan(
+          text: i < line.words.length - 1 ? '${word.qpcV1} ' : word.qpcV1,
+          recognizer: recognizer,
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 42.0,
+            height: 1.12,
+            wordSpacing: -2.0,
+            color: isSelected
+                ? theme.ornamentPrimary
+                : isKhatmaMark
+                    ? const Color(0xFF1F7A53)
+                    : theme.glyphColor,
+            backgroundColor: bgColor,
           ),
+        ),
+      );
+    }
+
+    return FittedBox(
+      fit: BoxFit.fitWidth,
+      alignment: Alignment.center,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: RichText(
+          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          text: TextSpan(children: spans),
         ),
       ),
     );
@@ -531,22 +602,6 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOpeningBottomCrown(MushafThemeData theme) {
-    return SizedBox(
-      height: 30,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _OrnamentalBandPainter(
-          primaryColor: theme.ornamentPrimary,
-          secondaryColor: theme.ornamentSecondary,
-          fillColor: theme.ornamentFill,
-          pageBackground: theme.pageBackground,
-          isTop: false,
         ),
       ),
     );
@@ -1115,215 +1170,6 @@ class _OpeningSpreadIlluminatedPainter extends CustomPainter {
     return oldDelegate.primaryColor != primaryColor ||
         oldDelegate.fillColor != fillColor ||
         oldDelegate.pageBackground != pageBackground;
-  }
-}
-
-/// Draws the ornate scalloped Islamic Mihrab/Medallion around the centered verses
-/// on Pages 1 & 2, with corner arabesque quarter-rosettes.
-class _CentralMedallionFramePainter extends CustomPainter {
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color fillColor;
-  final Color pageBackground;
-
-  const _CentralMedallionFramePainter({
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.fillColor,
-    required this.pageBackground,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    if (rect.isEmpty) return;
-
-    // Outer tinted medallion frame
-    final outerRRect = RRect.fromRectAndRadius(
-      rect,
-      const Radius.circular(18.0),
-    );
-    final innerRRect = RRect.fromRectAndRadius(
-      rect.deflate(6.0),
-      const Radius.circular(14.0),
-    );
-
-    // Fill the 6px frame ring with ornamentFill
-    final ringPath = Path()
-      ..addRRect(outerRRect)
-      ..addRRect(innerRRect)
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(
-      ringPath,
-      Paint()
-        ..color = fillColor
-        ..style = PaintingStyle.fill,
-    );
-
-    // Fill center with pageBackground
-    canvas.drawRRect(
-      innerRRect,
-      Paint()
-        ..color = pageBackground
-        ..style = PaintingStyle.fill,
-    );
-
-    final outerStroke = Paint()
-      ..color = primaryColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final innerStroke = Paint()
-      ..color = secondaryColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1;
-
-    canvas.drawRRect(outerRRect, outerStroke);
-    canvas.drawRRect(innerRRect, innerStroke);
-
-    // Inner chamfered/scalloped corner arches (الزوايا المحرابية الأربع)
-    final archStroke = Paint()
-      ..color = primaryColor.withValues(alpha: 0.65)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    final archFill = Paint()
-      ..color = fillColor.withValues(alpha: 0.85)
-      ..style = PaintingStyle.fill;
-
-    const cornerRadius = 24.0;
-    final innerBounds = rect.deflate(6.0);
-    canvas.save();
-    canvas.clipRRect(innerRRect);
-
-    final innerCorners = [
-      innerBounds.topLeft,
-      innerBounds.topRight,
-      innerBounds.bottomLeft,
-      innerBounds.bottomRight,
-    ];
-    for (final c in innerCorners) {
-      canvas.drawCircle(c, cornerRadius, archFill);
-      canvas.drawCircle(c, cornerRadius, archStroke);
-      canvas.drawCircle(c, cornerRadius * 0.62, archStroke);
-    }
-    canvas.restore();
-
-    // Top & Bottom center crown medallions on the medallion frame
-    _drawRosetteStar(
-      canvas,
-      Offset(size.width / 2, 3.0),
-      7.5,
-      primaryColor,
-      secondaryColor,
-      pageBackground,
-    );
-    _drawRosetteStar(
-      canvas,
-      Offset(size.width / 2, size.height - 3.0),
-      7.5,
-      primaryColor,
-      secondaryColor,
-      pageBackground,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _CentralMedallionFramePainter oldDelegate) {
-    return oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.fillColor != fillColor ||
-        oldDelegate.pageBackground != pageBackground;
-  }
-}
-
-/// Ornamental top & bottom crown bands on Pages 1 & 2.
-class _OrnamentalBandPainter extends CustomPainter {
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color fillColor;
-  final Color pageBackground;
-  final bool isTop;
-
-  const _OrnamentalBandPainter({
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.fillColor,
-    required this.pageBackground,
-    required this.isTop,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    if (rect.isEmpty) return;
-
-    final rrect = RRect.fromRectAndRadius(
-      rect.deflate(1.0),
-      const Radius.circular(8.0),
-    );
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..color = fillColor
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..color = primaryColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(3.5), const Radius.circular(6.0)),
-      Paint()
-        ..color = secondaryColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8,
-    );
-
-    final cy = size.height / 2;
-    // Draw twin rosette stars on left & right of the crown band
-    _drawRosetteStar(
-      canvas,
-      Offset(18.0, cy),
-      7.5,
-      primaryColor,
-      secondaryColor,
-      pageBackground,
-    );
-    _drawRosetteStar(
-      canvas,
-      Offset(size.width - 18.0, cy),
-      7.5,
-      primaryColor,
-      secondaryColor,
-      pageBackground,
-    );
-
-    if (!isTop) {
-      // On bottom crown band, draw a row of ornamental 8-point stars across the center
-      final count = ((size.width - 80) / 36).floor().clamp(3, 9);
-      final totalSpan = (count - 1) * 34.0;
-      final startX = (size.width - totalSpan) / 2;
-      for (int i = 0; i < count; i++) {
-        final isCenter = i == count ~/ 2;
-        _drawRosetteStar(
-          canvas,
-          Offset(startX + i * 34.0, cy),
-          isCenter ? 8.5 : 6.0,
-          primaryColor,
-          secondaryColor,
-          pageBackground,
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrnamentalBandPainter oldDelegate) {
-    return oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.fillColor != fillColor ||
-        oldDelegate.isTop != isTop;
   }
 }
 

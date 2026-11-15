@@ -74,32 +74,52 @@ class KhatmaService {
   }
 
   /// Starts a new Khatma, assigns it the next sequential serial number, and records start date/time.
+  /// Supports a custom [startedAt] date (e.g., in the past when continuing a Khatma started
+  /// on a physical Mushaf or another device) and an optional [initialAyah] starting position.
   Future<KhatmaRecord> startNewKhatma({
     String? customTitle,
     Map<String, dynamic>? metadata,
     AyahRecord? initialAyah,
+    DateTime? startedAt,
   }) async {
     final db = await _getDb();
     final maxRow = await db.rawQuery(
       'SELECT COALESCE(MAX(serial_number), 0) AS max_serial FROM khatmas',
     );
     final nextSerial = ((maxRow.first['max_serial'] as int?) ?? 0) + 1;
-    final nowIso = DateTime.now().toIso8601String();
+    final effectiveStart = startedAt ?? DateTime.now();
+    final startIso = effectiveStart.toIso8601String();
     final title = (customTitle != null && customTitle.trim().isNotEmpty)
         ? customTitle.trim()
         : 'الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}';
+
+    final mergedMeta = <String, dynamic>{
+      if (metadata != null) ...metadata,
+      if (initialAyah != null) ...{
+        'initial_verse_key': initialAyah.verseKey,
+        'initial_surah_id': initialAyah.surahId,
+        'initial_ayah_number': initialAyah.ayahNumber,
+        'initial_surah_name_arabic': initialAyah.surahNameArabic,
+        'initial_page_number': initialAyah.pageNumber,
+      },
+    };
 
     final id = await db.insert('khatmas', {
       'serial_number': nextSerial,
       'title': title,
       'status': KhatmaStatus.active.dbValue,
-      'started_at': nowIso,
+      'started_at': startIso,
       'completed_at': null,
-      'metadata_json': metadata != null ? jsonEncode(metadata) : null,
+      'metadata_json': mergedMeta.isNotEmpty ? jsonEncode(mergedMeta) : null,
     });
 
-    if (initialAyah != null) {
-      return (await markAyahProgress(id, initialAyah)).khatma;
+    if (initialAyah != null &&
+        (initialAyah.surahId != 1 || initialAyah.ayahNumber != 1)) {
+      return (await markAyahProgress(
+        id,
+        initialAyah,
+        notes: 'موضع بدء الختمة في التطبيق',
+      )).khatma;
     }
 
     final all = await getAllKhatmas();

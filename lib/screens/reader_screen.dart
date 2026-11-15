@@ -7,6 +7,7 @@ import '../state/mushaf_controller.dart';
 import '../utils/arabic_utils.dart';
 import '../widgets/mushaf_page_widget.dart';
 import '../widgets/reader_hud_overlay.dart';
+import '../widgets/surah_header_banner.dart';
 import 'ayah_explanation_sheet.dart';
 import 'bookmarks_sheet.dart';
 import 'index_sheet.dart';
@@ -28,6 +29,45 @@ class ReaderScreen extends StatefulWidget {
 
 class _ReaderScreenState extends State<ReaderScreen> {
   bool _isCurrentPageZoomed = false;
+  bool _showIstiadhahBanner = false;
+  Timer? _istiadhahTimer;
+
+  @override
+  void dispose() {
+    _istiadhahTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startStartupSequence() {
+    if (!mounted) return;
+    setState(() {
+      _showIstiadhahBanner = true;
+    });
+    _istiadhahTimer?.cancel();
+    _istiadhahTimer = Timer(const Duration(seconds: 3), () {
+      _dismissIstiadhahAndShowKhatmaPrompt();
+    });
+  }
+
+  void _dismissIstiadhahAndShowKhatmaPrompt() {
+    _istiadhahTimer?.cancel();
+    _istiadhahTimer = null;
+    if (!mounted) return;
+    if (_showIstiadhahBanner) {
+      setState(() {
+        _showIstiadhahBanner = false;
+      });
+    }
+    if (widget.controller.askKhatmaOnStartup) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showStartupKhatmaPromptDialog(
+          context,
+          controller: widget.controller,
+        );
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,26 +78,52 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
         if (!widget.controller.isInitialized) {
           return Scaffold(
-            backgroundColor: theme.scaffoldBackground,
+            backgroundColor: const Color(0xFF0B2C35),
             body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: theme.ornamentPrimary),
-                  const SizedBox(height: 16),
-                  Text(
-                    'جاري فتح المصحف الشريف...',
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                      color: theme.glyphColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 280,
+                          maxHeight: 280,
+                        ),
+                        child: Image.asset(
+                          'assets/images/intro_cover.jpg',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    const CircularProgressIndicator(
+                      color: Color(0xFFD4AF37),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'جاري فتح المصحف الشريف...',
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        color: Color(0xFFF3E5AB),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
+        }
+
+        if (!widget.controller.hasShownStartupSessionPrompt) {
+          widget.controller.markStartupSessionPromptShown();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _startStartupSequence();
+          });
         }
 
         return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -149,6 +215,40 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     SettingsSheet(controller: widget.controller),
                   ),
                 ),
+
+                // Decorative Startup "أعوذ بالله من الشيطان الرجيم" Artwork (2 seconds or until touched)
+                if (_showIstiadhahBanner)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _dismissIstiadhahAndShowKhatmaPrompt,
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.50),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 32,
+                        ),
+                        child: SafeArea(
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0.90, end: 1.0),
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, scale, child) {
+                              return Transform.scale(
+                                scale: scale,
+                                child: child,
+                              );
+                            },
+                            child: IstiadhahStartupBanner(
+                              theme: theme,
+                              onTap: _dismissIstiadhahAndShowKhatmaPrompt,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

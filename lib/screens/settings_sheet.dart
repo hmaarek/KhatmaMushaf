@@ -397,26 +397,57 @@ class SettingsSheet extends StatelessWidget {
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: theme.pageInnerBorder),
                             ),
-                            child: SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              activeThumbColor: const Color(0xFF2B8A62),
-                              value: controller.showLastPageKhatmaButton,
-                              onChanged: controller.setShowLastPageKhatmaButton,
-                              title: Text(
-                                'زر إتمام الختمة في آخر صفحة',
-                                style: TextStyle(
-                                  color: theme.glyphColor,
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
+                            child: Column(
+                              children: [
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: theme.ornamentPrimary,
+                                  value: controller.askKhatmaOnStartup,
+                                  onChanged: controller.setAskKhatmaOnStartup,
+                                  title: Text(
+                                    'السؤال عن الختمة عند فتح التطبيق',
+                                    style: TextStyle(
+                                      color: theme.glyphColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'عرض نافذة الاختيار عند بدء التشغيل (مواصلة الختمة الحالية، بدء ختمة جديدة، أو قراءة حرة)',
+                                    style: TextStyle(
+                                      color: theme.secondaryTextColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              subtitle: Text(
-                                'إظهار زر خاص أسفل سورة الناس (بعد الآية ٦ في صفحة ٦٠٤) لإتمام الختمة وعرض التقرير',
-                                style: TextStyle(
-                                  color: theme.secondaryTextColor,
-                                  fontSize: 12,
+                                Divider(
+                                  height: 1,
+                                  color: theme.pageInnerBorder
+                                      .withValues(alpha: 0.6),
                                 ),
-                              ),
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: const Color(0xFF2B8A62),
+                                  value: controller.showLastPageKhatmaButton,
+                                  onChanged:
+                                      controller.setShowLastPageKhatmaButton,
+                                  title: Text(
+                                    'زر إتمام الختمة في آخر صفحة',
+                                    style: TextStyle(
+                                      color: theme.glyphColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'إظهار زر خاص أسفل سورة الناس (بعد الآية ٦ في صفحة ٦٠٤) لإتمام الختمة وعرض التقرير',
+                                    style: TextStyle(
+                                      color: theme.secondaryTextColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
 

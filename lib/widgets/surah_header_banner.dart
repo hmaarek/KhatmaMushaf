@@ -68,6 +68,59 @@ class SurahHeaderBanner extends StatelessWidget {
   }
 }
 
+/// Decorative illuminated calligraphy artwork displaying "أعوذ بالله من الشيطان الرجيم"
+/// at app startup for 2 seconds or until touched by the user.
+class IstiadhahStartupBanner extends StatelessWidget {
+  final MushafThemeData theme;
+  final VoidCallback? onTap;
+
+  const IstiadhahStartupBanner({
+    super.key,
+    required this.theme,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final cardWidth = (screenSize.width * 0.78).clamp(240.0, 360.0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: cardWidth,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: theme.ornamentPrimary,
+            width: 2.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 24,
+              spreadRadius: 2,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: AspectRatio(
+            aspectRatio: 1116 / 2000,
+            child: Image.asset(
+              'assets/images/istiadhah_banner.jpg',
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Ornate floral rosette & arabesque banner painter for all 114 Surah headers,
 /// modeled after the classic Mushaf Surah header banner.
 class _OpeningSurahBannerPainter extends CustomPainter {

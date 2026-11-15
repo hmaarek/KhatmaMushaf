@@ -73,6 +73,8 @@ class MushafController extends ChangeNotifier {
   static const String _prefAutoPlayAyahAfterWord =
       'mushaf_auto_play_ayah_after_word';
   static const String _prefReciterIndex = 'mushaf_reciter_index';
+  static const String _prefAskKhatmaOnStartup =
+      'mushaf_ask_khatma_on_startup';
 
   final DatabaseService _dbService = DatabaseService.instance;
   final QpcFontLoaderService _fontLoader = QpcFontLoaderService.instance;
@@ -91,6 +93,8 @@ class MushafController extends ChangeNotifier {
   bool _enableSingleTapWordPronunciation = true;
   bool _hasShownSingleTapIntroDialog = false;
   bool _autoPlayAyahAfterWord = false;
+  bool _askKhatmaOnStartup = true;
+  bool _hasShownStartupSessionPrompt = false;
   QuranReciter _selectedReciter = QuranReciter.husaryMurattal;
   bool _isHudVisible = false;
   String? _selectedVerseKey;
@@ -113,6 +117,8 @@ class MushafController extends ChangeNotifier {
       _enableSingleTapWordPronunciation;
   bool get hasShownSingleTapIntroDialog => _hasShownSingleTapIntroDialog;
   bool get autoPlayAyahAfterWord => _autoPlayAyahAfterWord;
+  bool get askKhatmaOnStartup => _askKhatmaOnStartup;
+  bool get hasShownStartupSessionPrompt => _hasShownStartupSessionPrompt;
   QuranReciter get selectedReciter => _selectedReciter;
   bool get isHudVisible => _isHudVisible;
   String? get selectedVerseKey => _selectedVerseKey;
@@ -186,6 +192,8 @@ class MushafController extends ChangeNotifier {
         _prefs?.getBool(_prefShownSingleTapWordIntro) ?? false;
     final savedAutoPlayAyah =
         _prefs?.getBool(_prefAutoPlayAyahAfterWord) ?? false;
+    final savedAskKhatmaStartup =
+        _prefs?.getBool(_prefAskKhatmaOnStartup) ?? true;
     final savedReciterIdx = (_prefs?.getInt(_prefReciterIndex) ?? 0)
         .clamp(0, QuranReciter.values.length - 1);
 
@@ -197,6 +205,7 @@ class MushafController extends ChangeNotifier {
     _enableSingleTapWordPronunciation = savedSingleTapWord;
     _hasShownSingleTapIntroDialog = savedShownSingleTapIntro;
     _autoPlayAyahAfterWord = savedAutoPlayAyah;
+    _askKhatmaOnStartup = savedAskKhatmaStartup;
     _selectedReciter = QuranReciter.values[savedReciterIdx];
     _pageController = PageController(initialPage: _currentPage - 1);
 
@@ -396,6 +405,17 @@ class MushafController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setAskKhatmaOnStartup(bool value) {
+    if (_askKhatmaOnStartup == value) return;
+    _askKhatmaOnStartup = value;
+    _prefs?.setBool(_prefAskKhatmaOnStartup, value);
+    notifyListeners();
+  }
+
+  void markStartupSessionPromptShown() {
+    _hasShownStartupSessionPrompt = true;
+  }
+
   void setSelectedReciter(QuranReciter reciter) {
     if (_selectedReciter == reciter) return;
     _selectedReciter = reciter;
@@ -476,14 +496,17 @@ class MushafController extends ChangeNotifier {
 
   // -------------------- Khatma Operations --------------------
 
-  /// Starts a new Khatma (with sequential serial number & current date/time).
+  /// Starts a new Khatma (with sequential serial number, optional past/custom [startedAt],
+  /// and optional [initialAyah] starting verse).
   Future<KhatmaRecord> startNewKhatma({
     String? customTitle,
     AyahRecord? initialAyah,
+    DateTime? startedAt,
   }) async {
     final created = await _khatmaService.startNewKhatma(
       customTitle: customTitle,
       initialAyah: initialAyah,
+      startedAt: startedAt,
     );
     _khatmas = await _khatmaService.getAllKhatmas();
     notifyListeners();

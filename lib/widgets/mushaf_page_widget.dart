@@ -3,7 +3,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../models/mushaf_models.dart';
-import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
@@ -499,6 +498,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     final selectedWordLoc = widget.controller.selectedWordLocation;
     final singleTapEnabled =
         widget.controller.enableSingleTapWordPronunciation;
+    final isIndoPak = widget.controller.isIndoPakScript;
+    final effectiveFont = isIndoPak ? 'IndoPak' : fontFamily;
+    final effectiveWordSpacing = isIndoPak ? 1.5 : wordSpacing;
 
     final spans = <InlineSpan>[];
 
@@ -546,16 +548,19 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           },
         );
         _recognizers.add(markerRecognizer);
+        final mText = isIndoPak
+            ? '\u06DD${_toEasternArabicDigits(word.ayahNumber)}'
+            : word.qpcV1;
 
         spans.add(
           TextSpan(
-            text: isLastInLine ? word.qpcV1 : '${word.qpcV1} ',
+            text: isLastInLine ? mText : '$mText ',
             recognizer: markerRecognizer,
             style: TextStyle(
-              fontFamily: fontFamily,
+              fontFamily: effectiveFont,
               fontSize: fontSize * 1.18,
               height: lineHeight,
-              wordSpacing: wordSpacing,
+              wordSpacing: effectiveWordSpacing,
               color: isSelectedAyah
                   ? theme.ornamentPrimary
                   : isKhatmaMark
@@ -566,8 +571,12 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           ),
         );
       } else if (word.hasTrailingVerseMarker) {
-        final wordPart = word.wordOnlyQpcV1;
-        final markerPart = word.verseMarkerQpcV1!;
+        final wordPart = isIndoPak
+            ? _toIndoPakWord(word.cleanWordUthmani)
+            : word.wordOnlyQpcV1;
+        final markerPart = isIndoPak
+            ? '\u06DD${_toEasternArabicDigits(word.ayahNumber)}'
+            : word.verseMarkerQpcV1!;
 
         final wordRecognizer = _WordTapAndLongPressRecognizer(
           onTap: singleTapEnabled && widget.onWordTap != null
@@ -596,10 +605,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             text: '$wordPart ',
             recognizer: wordRecognizer,
             style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: fontSize * 1.18,
+              fontFamily: effectiveFont,
+              fontSize: fontSize,
               height: lineHeight,
-              wordSpacing: wordSpacing,
+              wordSpacing: effectiveWordSpacing,
               color: wordTextColor,
               backgroundColor:
                   isSelectedWord ? wordBgColor : baseBgColor,
@@ -612,10 +621,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             text: isLastInLine ? markerPart : '$markerPart ',
             recognizer: markerRecognizer,
             style: TextStyle(
-              fontFamily: fontFamily,
+              fontFamily: effectiveFont,
               fontSize: fontSize * 1.18,
               height: lineHeight,
-              wordSpacing: wordSpacing,
+              wordSpacing: effectiveWordSpacing,
               color: isSelectedAyah
                   ? theme.ornamentPrimary
                   : isKhatmaMark
@@ -636,16 +645,19 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           },
         );
         _recognizers.add(wordRecognizer);
+        final wText = isIndoPak
+            ? _toIndoPakWord(word.cleanWordUthmani)
+            : word.qpcV1;
 
         spans.add(
           TextSpan(
-            text: isLastInLine ? word.qpcV1 : '${word.qpcV1} ',
+            text: isLastInLine ? wText : '$wText ',
             recognizer: wordRecognizer,
             style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: fontSize * 1.18,
+              fontFamily: effectiveFont,
+              fontSize: fontSize,
               height: lineHeight,
-              wordSpacing: wordSpacing,
+              wordSpacing: effectiveWordSpacing,
               color: wordTextColor,
               backgroundColor:
                   isSelectedWord ? wordBgColor : baseBgColor,
@@ -948,76 +960,25 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   }
 
 
-  Widget _buildIndoPakPageBody(
-    MushafPageData pageData,
-    MushafThemeData theme,
-    double fontScale,
-  ) {
-    return FutureBuilder<
-        List<({String verseKey, int surahId, int ayahNumber, String textIndopak})>>(
-      future: DatabaseService.instance.getIndoPakVersesForPage(widget.pageNumber),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: theme.ornamentPrimary,
-            ),
-          );
-        }
-        final verses = snapshot.data!;
-        final selectedVerse = widget.controller.selectedVerseKey;
-        final playingAyahKey = widget.controller.playingAyahVerseKey;
+  static String _toEasternArabicDigits(int number) {
+    const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    final s = number.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      buf.write(c >= 48 && c <= 57 ? digits[c - 48] : s[i]);
+    }
+    return buf.toString();
+  }
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Directionality(
-            textDirection: TextDirection.rtl,
-            child: RichText(
-              textAlign: TextAlign.justify,
-              text: TextSpan(
-                children: [
-                  for (final v in verses) ...[
-                    TextSpan(
-                      text: '${v.textIndopak} ',
-                      style: TextStyle(
-                        fontFamily: 'IndoPak',
-                        fontSize: 23.0 * fontScale,
-                        height: 2.05,
-                        color: (selectedVerse == v.verseKey ||
-                                playingAyahKey == v.verseKey)
-                            ? theme.ornamentPrimary
-                            : widget.controller.isKhatmaCurrentVerse(v.verseKey)
-                                ? const Color(0xFF1F7A53)
-                                : theme.glyphColor,
-                        backgroundColor: (selectedVerse == v.verseKey ||
-                                playingAyahKey == v.verseKey)
-                            ? theme.ayahHighlightFill
-                            : widget.controller.isKhatmaCurrentVerse(v.verseKey)
-                                ? const Color(0x3D2B8A62)
-                                : widget.controller.isAyahBookmarked(v.verseKey)
-                                    ? widget.controller.savedAyahHighlightColor
-                                        .withValues(alpha: 0.28)
-                                    : null,
-                      ),
-                    ),
-                    TextSpan(
-                      text: ' ﴿${ArabicUtils.toArabicDigits(v.ayahNumber)}﴾ ',
-                      style: TextStyle(
-                        fontFamily: 'IndoPak',
-                        fontSize: 21.0 * fontScale,
-                        height: 2.05,
-                        color: theme.ornamentPrimary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+  /// Converts an Uthmani word to Indo-Pak orthography for `IndoPak.ttf`.
+  static String _toIndoPakWord(String uthmani) {
+    return uthmani
+        .replaceAll('\u0671', '\u0627') // Alef Wasla -> Alef
+        .replaceAll('\u0640\u0670', '\u0670') // Tatweel + dagger alef -> standing fatha
+        .replaceAll('\u0652', '\u06E1') // Sukun -> Indo-Pak jazm
+        .replaceAll('\u06DF', '') // Remove Uthmani small high rounded zero
+        .replaceAll('\u06E0', '');
   }
 
   Widget _buildFooterPageNumber(int pageNumber, MushafThemeData theme) {

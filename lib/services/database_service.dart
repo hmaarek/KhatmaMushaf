@@ -37,6 +37,45 @@ class DatabaseService {
     }
 
     final db = await openDatabase(dbPath);
+    // Migrate existing installs to include `text_indopak` if missing
+    final cols = await db.rawQuery('PRAGMA table_info(ayahs)');
+    final hasIndopak = cols.any((c) => c['name'] == 'text_indopak');
+    if (!hasIndopak) {
+      await db.execute('ALTER TABLE ayahs ADD COLUMN text_indopak TEXT');
+      final tmpPath = p.join(dbFolder, 'mushaf_indopak_seed.db');
+      try {
+        final byteData = await rootBundle.load('assets/mushaf.db');
+        final bytes = byteData.buffer.asUint8List(
+          byteData.offsetInBytes,
+          byteData.lengthInBytes,
+        );
+        await File(tmpPath).writeAsBytes(bytes, flush: true);
+        final seedDb = await openReadOnlyDatabase(tmpPath);
+        final seedRows = await seedDb.query(
+          'ayahs',
+          columns: ['verse_key', 'text_indopak'],
+        );
+        await seedDb.close();
+        await db.transaction((txn) async {
+          final batch = txn.batch();
+          for (final r in seedRows) {
+            batch.update(
+              'ayahs',
+              {'text_indopak': r['text_indopak']},
+              where: 'verse_key = ?',
+              whereArgs: [r['verse_key']],
+            );
+          }
+          await batch.commit(noResult: true);
+        });
+      } finally {
+        final f = File(tmpPath);
+        if (await f.exists()) {
+          await f.delete();
+        }
+      }
+    }
+
     // Ensure bookmarks table exists for user data persistence
     await db.execute('''
       CREATE TABLE IF NOT EXISTS bookmarks (

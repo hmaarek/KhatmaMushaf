@@ -9,6 +9,29 @@ class QpcFontLoaderService {
 
   final Set<int> _loadedPages = <int>{};
   final Map<int, Future<void>> _inFlightLoads = <int, Future<void>>{};
+  bool _indoPakLoaded = false;
+  Future<void>? _indoPakInFlight;
+
+  /// Ensures `assets/fonts/IndoPak.ttf` is registered under family `'IndoPak'`.
+  Future<void> ensureIndoPakFontLoaded() async {
+    if (_indoPakLoaded) return;
+    if (_indoPakInFlight != null) {
+      await _indoPakInFlight;
+      return;
+    }
+    final future = () async {
+      try {
+        final loader = FontLoader('IndoPak');
+        loader.addFont(rootBundle.load('assets/fonts/IndoPak.ttf'));
+        await loader.load();
+        _indoPakLoaded = true;
+      } finally {
+        _indoPakInFlight = null;
+      }
+    }();
+    _indoPakInFlight = future;
+    await future;
+  }
 
   /// Returns the registered Flutter font family name for [pageNumber] (1..604).
   static String fontFamilyForPage(int pageNumber) {
@@ -53,7 +76,10 @@ class QpcFontLoaderService {
 
   /// Preloads the font for [centerPage] and its immediate neighbors (+/- [radius]).
   Future<void> preloadWindow(int centerPage, {int radius = 2}) async {
-    await ensurePageFontLoaded(centerPage);
+    await Future.wait([
+      ensureIndoPakFontLoaded(),
+      ensurePageFontLoaded(centerPage),
+    ]);
     final futures = <Future<void>>[];
     for (int offset = 1; offset <= radius; offset++) {
       final next = centerPage + offset;

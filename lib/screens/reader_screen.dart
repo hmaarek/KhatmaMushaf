@@ -18,10 +18,7 @@ import 'settings_sheet.dart';
 class ReaderScreen extends StatefulWidget {
   final MushafController controller;
 
-  const ReaderScreen({
-    super.key,
-    required this.controller,
-  });
+  const ReaderScreen({super.key, required this.controller});
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -105,8 +102,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
               ),
               title: Column(
                 children: [
-                  Icon(Icons.language_rounded,
-                      color: theme.ornamentPrimary, size: 36),
+                  Icon(
+                    Icons.language_rounded,
+                    color: theme.ornamentPrimary,
+                    size: 36,
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'اختر اللغة',
@@ -132,11 +132,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  langButton('العربية', AppLanguage.arabic,
-                      Icons.translate_rounded),
-                  const SizedBox(height: 12),
                   langButton(
-                      'English', AppLanguage.english, Icons.abc_rounded),
+                    'العربية',
+                    AppLanguage.arabic,
+                    Icons.translate_rounded,
+                  ),
+                  const SizedBox(height: 12),
+                  langButton('English', AppLanguage.english, Icons.abc_rounded),
                 ],
               ),
             ),
@@ -158,10 +160,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (widget.controller.askKhatmaOnStartup) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        showStartupKhatmaPromptDialog(
-          context,
-          controller: widget.controller,
-        );
+        showStartupKhatmaPromptDialog(context, controller: widget.controller);
       });
     }
   }
@@ -196,12 +195,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const CircularProgressIndicator(
-                      color: Color(0xFFD4AF37),
-                    ),
+                    const CircularProgressIndicator(color: Color(0xFFD4AF37)),
                     const SizedBox(height: 16),
                     Text(
-                      tr(tr('جاري فتح المصحف الشريف...', 'Opening the Holy Quran...'), 'Opening the Holy Quran...'),
+                      tr(
+                        tr(
+                          'جاري فتح المصحف الشريف...',
+                          'Opening the Holy Quran...',
+                        ),
+                        'Opening the Holy Quran...',
+                      ),
                       textDirection: L10n.dir,
                       style: const TextStyle(
                         color: Color(0xFFF3E5AB),
@@ -231,49 +234,37 @@ class _ReaderScreenState extends State<ReaderScreen> {
             backgroundColor: theme.scaffoldBackground,
             body: Stack(
               children: [
-                // 604-page Right-to-Left (RTL) PageView navigation
+                // 604-page navigation: RTL side-flipping PageView, or a
+                // continuous smooth vertical scroll (configurable in settings)
                 SafeArea(
-                  child: Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: PageView.builder(
-                      controller: widget.controller.pageController,
-                      physics: _isCurrentPageZoomed
-                          ? const NeverScrollableScrollPhysics()
-                          : const PageScrollPhysics(),
-                      itemCount: 604,
-                      onPageChanged: (idx) {
-                        if (_isCurrentPageZoomed) {
-                          setState(() => _isCurrentPageZoomed = false);
-                        }
-                        widget.controller.onPageChanged(idx);
-                      },
-                      itemBuilder: (context, index) {
-                        final pageNum = index + 1;
-                        return MushafPageWidget(
-                          pageNumber: pageNum,
+                  child: widget.controller.verticalScroll
+                      ? _VerticalMushafScroller(
                           controller: widget.controller,
-                          onCenterTap: widget.controller.toggleHud,
-                          onWordTap: (word) =>
-                              _handleWordSingleTap(context, word),
-                          onVerseMarkerTap: (word) =>
-                              _handleVerseMarkerTap(word),
-                          onZoomChanged: (zoomed) {
-                            if (_isCurrentPageZoomed != zoomed) {
-                              setState(() => _isCurrentPageZoomed = zoomed);
-                            }
-                          },
-                          onAyahLongPress: (verseKey, tappedWord) =>
-                              _showAyahActionSheet(
-                                context,
-                                verseKey,
-                                tappedWord: tappedWord,
-                              ),
-                          onCompleteKhatmaTap: () =>
-                              _handleCompleteKhatmaFromLastPage(context),
-                        );
-                      },
-                    ),
-                  ),
+                          locked: _isCurrentPageZoomed,
+                          pageBuilder: (context, pageNum) => _buildMushafPage(
+                            context,
+                            pageNum,
+                            embedded: true,
+                          ),
+                        )
+                      : Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: PageView.builder(
+                            controller: widget.controller.pageController,
+                            physics: _isCurrentPageZoomed
+                                ? const NeverScrollableScrollPhysics()
+                                : const PageScrollPhysics(),
+                            itemCount: 604,
+                            onPageChanged: (idx) {
+                              if (_isCurrentPageZoomed) {
+                                setState(() => _isCurrentPageZoomed = false);
+                              }
+                              widget.controller.onPageChanged(idx);
+                            },
+                            itemBuilder: (context, index) =>
+                                _buildMushafPage(context, index + 1),
+                          ),
+                        ),
                 ),
 
                 // Floating Word Pronunciation & Full Ayah Audio Bar
@@ -354,6 +345,29 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  Widget _buildMushafPage(
+    BuildContext context,
+    int pageNum, {
+    bool embedded = false,
+  }) {
+    return MushafPageWidget(
+      pageNumber: pageNum,
+      controller: widget.controller,
+      scrollEmbedded: embedded,
+      onCenterTap: widget.controller.toggleHud,
+      onWordTap: (word) => _handleWordSingleTap(context, word),
+      onVerseMarkerTap: (word) => _handleVerseMarkerTap(word),
+      onZoomChanged: (zoomed) {
+        if (_isCurrentPageZoomed != zoomed) {
+          setState(() => _isCurrentPageZoomed = zoomed);
+        }
+      },
+      onAyahLongPress: (verseKey, tappedWord) =>
+          _showAyahActionSheet(context, verseKey, tappedWord: tappedWord),
+      onCompleteKhatmaTap: () => _handleCompleteKhatmaFromLastPage(context),
+    );
+  }
+
   void _openModalSheet(BuildContext context, Widget sheet) {
     showModalBottomSheet<void>(
       context: context,
@@ -368,10 +382,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return info == null ? fallback : L10n.surahName(info);
   }
 
-  Future<void> _handleWordSingleTap(
-    BuildContext context,
-    LineWord word,
-  ) async {
+  Future<void> _handleWordSingleTap(BuildContext context, LineWord word) async {
     final isFirstTime = !widget.controller.hasShownSingleTapIntroDialog;
     unawaited(widget.controller.pronounceWord(word));
 
@@ -382,10 +393,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _handleVerseMarkerTap(LineWord word) async {
-    await widget.controller.playAyahAudio(
-      word.surahId,
-      word.ayahNumber,
-    );
+    await widget.controller.playAyahAudio(word.surahId, word.ayahNumber);
   }
 
   Future<void> _showFirstTimeSingleTapDialog(BuildContext context) async {
@@ -411,7 +419,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    tr(tr('ميزة نطق الكلمات باللمس', 'Tap-to-Pronounce Words'), 'Tap-to-pronounce words'),
+                    tr(
+                      tr('ميزة نطق الكلمات باللمس', 'Tap-to-Pronounce Words'),
+                      'Tap-to-pronounce words',
+                    ),
                     style: TextStyle(
                       color: theme.glyphColor,
                       fontSize: 17,
@@ -499,10 +510,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           decoration: BoxDecoration(
             color: theme.pageBackground.withValues(alpha: 0.97),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.ornamentPrimary,
-              width: 1.6,
-            ),
+            border: Border.all(color: theme.ornamentPrimary, width: 1.6),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.18),
@@ -529,7 +537,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     child: Text(
                       activeWord != null
                           ? activeWord.cleanWordUthmani
-                          : tr('الآية ${L10n.n(ayahNum)}', 'Ayah ${L10n.n(ayahNum)}'),
+                          : tr(
+                              'الآية ${L10n.n(ayahNum)}',
+                              'Ayah ${L10n.n(ayahNum)}',
+                            ),
                       style: TextStyle(
                         color: theme.glyphColor,
                         fontSize: activeWord != null ? 22 : 16,
@@ -547,10 +558,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           activeWord != null
                               ? tr(
                                   'سورة $surahName • آية ${L10n.n(ayahNum)} (كلمة ${L10n.n(activeWord.wordNumberInAyah)})',
-                                  'Surah $surahName • Ayah ${L10n.n(ayahNum)} (word ${L10n.n(activeWord.wordNumberInAyah)})')
+                                  'Surah $surahName • Ayah ${L10n.n(ayahNum)} (word ${L10n.n(activeWord.wordNumberInAyah)})',
+                                )
                               : tr(
                                   'سورة $surahName • تلاوة الآية ${L10n.n(ayahNum)}',
-                                  'Surah $surahName • Reciting ayah ${L10n.n(ayahNum)}'),
+                                  'Surah $surahName • Reciting ayah ${L10n.n(ayahNum)}',
+                                ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -584,10 +597,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               child: Text(
                                 audio.statusMessage ??
                                     (activeWord != null
-                                        ? tr(tr('اضغط لإعادة نطق الكلمة أو سماع الآية كاملة', 'Tap to replay word or listen to full ayah'),
-                                            'Tap to replay the word or hear the full ayah')
-                                        : tr('القارئ: ${widget.controller.selectedReciter.shortDisplayName}',
-                                            'Reciter: ${widget.controller.selectedReciter.shortDisplayName}')),
+                                        ? tr(
+                                            tr(
+                                              'اضغط لإعادة نطق الكلمة أو سماع الآية كاملة',
+                                              'Tap to replay word or listen to full ayah',
+                                            ),
+                                            'Tap to replay the word or hear the full ayah',
+                                          )
+                                        : tr(
+                                            'القارئ: ${widget.controller.selectedReciter.shortDisplayName}',
+                                            'Reciter: ${widget.controller.selectedReciter.shortDisplayName}',
+                                          )),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -678,7 +698,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       label: Text(
                         audio.isPlayingAyah
                             ? tr(tr('إيقاف التلاوة', 'Stop'), 'Stop recitation')
-                            : tr(tr('تلاوة الآية كاملة', 'Play Full Ayah'), 'Recite full ayah'),
+                            : tr(
+                                tr('تلاوة الآية كاملة', 'Play Full Ayah'),
+                                'Recite full ayah',
+                              ),
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
@@ -710,7 +733,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     },
                     icon: const Icon(Icons.menu_book_rounded, size: 17),
                     label: Text(
-                      tr(tr('المعنى والتفسير', 'Meaning & Tafsir'), 'Meaning & Tafsir'),
+                      tr(
+                        tr('المعنى والتفسير', 'Meaning & Tafsir'),
+                        'Meaning & Tafsir',
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -723,55 +749,59 @@ class _ReaderScreenState extends State<ReaderScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Flexible(child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => widget.controller.setAutoPlayAyahAfterWord(
-                      !widget.controller.autoPlayAyahAfterWord,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
+                  Flexible(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => widget.controller.setAutoPlayAyahAfterWord(
+                        !widget.controller.autoPlayAyahAfterWord,
                       ),
-                      decoration: BoxDecoration(
-                        color: widget.controller.autoPlayAyahAfterWord
-                            ? const Color(0xFF2B8A62).withValues(alpha: 0.15)
-                            : theme.ornamentFill,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: widget.controller.autoPlayAyahAfterWord
-                              ? const Color(0xFF2B8A62)
-                              : theme.pageInnerBorder,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            widget.controller.autoPlayAyahAfterWord
-                                ? Icons.check_circle_rounded
-                                : Icons.playlist_play_rounded,
-                            size: 15,
+                        decoration: BoxDecoration(
+                          color: widget.controller.autoPlayAyahAfterWord
+                              ? const Color(0xFF2B8A62).withValues(alpha: 0.15)
+                              : theme.ornamentFill,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
                             color: widget.controller.autoPlayAyahAfterWord
                                 ? const Color(0xFF2B8A62)
-                                : theme.secondaryTextColor,
+                                : theme.pageInnerBorder,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            tr('تشغيل تلاوة الآية كاملة تلقائياً بعد نطق الكلمة (${widget.controller.selectedReciter.shortDisplayName})',
-                                'Auto-play full ayah after the word (${widget.controller.selectedReciter.shortDisplayName})'),
-                            style: TextStyle(
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.controller.autoPlayAyahAfterWord
+                                  ? Icons.check_circle_rounded
+                                  : Icons.playlist_play_rounded,
+                              size: 15,
                               color: widget.controller.autoPlayAyahAfterWord
                                   ? const Color(0xFF2B8A62)
                                   : theme.secondaryTextColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              tr(
+                                'تشغيل تلاوة الآية كاملة تلقائياً بعد نطق الكلمة (${widget.controller.selectedReciter.shortDisplayName})',
+                                'Auto-play full ayah after the word (${widget.controller.selectedReciter.shortDisplayName})',
+                              ),
+                              style: TextStyle(
+                                color: widget.controller.autoPlayAyahAfterWord
+                                    ? const Color(0xFF2B8A62)
+                                    : theme.secondaryTextColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  )),
+                  ),
                 ],
               ),
             ],
@@ -824,7 +854,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    tr(tr('لم يتم بدء ختمة جديدة', 'No Active Khatma'), 'No khatma started'),
+                    tr(
+                      tr('لم يتم بدء ختمة جديدة', 'No Active Khatma'),
+                      'No khatma started',
+                    ),
                     style: TextStyle(
                       color: theme.glyphColor,
                       fontSize: 17,
@@ -836,7 +869,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
             ),
             content: Text(
               tr(
-                tr('لا توجد ختمة جارية حالياً، ولا يمكن إتمام ختمة لم يتم بدؤها مسبقاً.\n\nهل تؤكد إضافة ختمة جديدة الآن وإتمامها فوراً؟', 'There is no active Khatma. Do you want to create a new Khatma and mark it completed now?'),
+                tr(
+                  'لا توجد ختمة جارية حالياً، ولا يمكن إتمام ختمة لم يتم بدؤها مسبقاً.\n\nهل تؤكد إضافة ختمة جديدة الآن وإتمامها فوراً؟',
+                  'There is no active Khatma. Do you want to create a new Khatma and mark it completed now?',
+                ),
                 'There is no active khatma, and a khatma cannot be completed before it is started.\n\nDo you want to add a new khatma now and complete it immediately?',
               ),
               style: TextStyle(
@@ -869,7 +905,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 onPressed: () => Navigator.of(dialogCtx).pop(true),
                 icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
                 label: Text(
-                  tr(tr('إضافة ختمة وإتمامها الآن', 'Add & Complete Now'), 'Add khatma & complete now'),
+                  tr(
+                    tr('إضافة ختمة وإتمامها الآن', 'Add & Complete Now'),
+                    'Add khatma & complete now',
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -899,27 +938,28 @@ class _ReaderScreenState extends State<ReaderScreen> {
           builder: (context, _) {
             final theme = widget.controller.theme;
             final audio = widget.controller.audioService;
-            final isBookmarked =
-                widget.controller.isAyahBookmarked(ayah.verseKey);
+            final isBookmarked = widget.controller.isAyahBookmarked(
+              ayah.verseKey,
+            );
             final activeKhatma = widget.controller.activeKhatma;
-            final isCurrentKhatmaMark =
-                widget.controller.isKhatmaCurrentVerse(ayah.verseKey);
+            final isCurrentKhatmaMark = widget.controller.isKhatmaCurrentVerse(
+              ayah.verseKey,
+            );
 
             final surahInfo = widget.controller.getSurahById(ayah.surahId);
-            final ayahSurahName =
-                surahInfo != null ? L10n.surahName(surahInfo) : ayah.surahNameArabic;
+            final ayahSurahName = surahInfo != null
+                ? L10n.surahName(surahInfo)
+                : ayah.surahNameArabic;
             return Directionality(
               textDirection: L10n.dir,
               child: Container(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 decoration: BoxDecoration(
                   color: theme.pageBackground,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
-                  border: Border.all(
-                    color: theme.pageOuterBorder,
-                    width: 1.5,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
                   ),
+                  border: Border.all(color: theme.pageOuterBorder, width: 1.5),
                 ),
                 child: SafeArea(
                   top: false,
@@ -932,8 +972,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: theme.secondaryTextColor
-                                .withValues(alpha: 0.35),
+                            color: theme.secondaryTextColor.withValues(
+                              alpha: 0.35,
+                            ),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -943,8 +984,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            tr('سورة $ayahSurahName • الآية ${L10n.n(ayah.ayahNumber)}',
-                                'Surah $ayahSurahName • Ayah ${L10n.n(ayah.ayahNumber)}'),
+                            tr(
+                              'سورة $ayahSurahName • الآية ${L10n.n(ayah.ayahNumber)}',
+                              'Surah $ayahSurahName • Ayah ${L10n.n(ayah.ayahNumber)}',
+                            ),
                             style: TextStyle(
                               color: theme.ornamentPrimary,
                               fontSize: 16,
@@ -962,8 +1005,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               border: Border.all(color: theme.pageInnerBorder),
                             ),
                             child: Text(
-                              tr('ص ${L10n.n(ayah.pageNumber)} • جزء ${L10n.n(ayah.juzNumber)}',
-                                  'p. ${L10n.n(ayah.pageNumber)} • Juz ${L10n.n(ayah.juzNumber)}'),
+                              tr(
+                                'ص ${L10n.n(ayah.pageNumber)} • جزء ${L10n.n(ayah.juzNumber)}',
+                                'p. ${L10n.n(ayah.pageNumber)} • Juz ${L10n.n(ayah.juzNumber)}',
+                              ),
                               style: TextStyle(
                                 color: theme.secondaryTextColor,
                                 fontSize: 12,
@@ -982,7 +1027,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           color: theme.ornamentFill,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: theme.ornamentPrimary.withValues(alpha: 0.55),
+                            color: theme.ornamentPrimary.withValues(
+                              alpha: 0.55,
+                            ),
                           ),
                         ),
                         child: Column(
@@ -1003,8 +1050,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        tr('الكلمة المحددة (رقم ${L10n.n(tappedWord.wordNumberInAyah)}):',
-                                            'Selected word (#${L10n.n(tappedWord.wordNumberInAyah)}):'),
+                                        tr(
+                                          'الكلمة المحددة (رقم ${L10n.n(tappedWord.wordNumberInAyah)}):',
+                                          'Selected word (#${L10n.n(tappedWord.wordNumberInAyah)}):',
+                                        ),
                                         style: TextStyle(
                                           color: theme.secondaryTextColor,
                                           fontSize: 12.5,
@@ -1051,20 +1100,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                           vertical: 10,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                       ),
                                       onPressed: () {
-                                        widget.controller
-                                            .pronounceWord(tappedWord);
+                                        widget.controller.pronounceWord(
+                                          tappedWord,
+                                        );
                                       },
                                       icon: const Icon(
                                         Icons.volume_up_rounded,
                                         size: 18,
                                       ),
                                       label: Text(
-                                        tr(tr('نطق الكلمة', 'Pronounce Word'), 'Pronounce word'),
+                                        tr(
+                                          tr('نطق الكلمة', 'Pronounce Word'),
+                                          'Pronounce word',
+                                        ),
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w800,
                                         ),
@@ -1076,7 +1130,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: audio.isPlayingAyah &&
+                                      backgroundColor:
+                                          audio.isPlayingAyah &&
                                               audio.activeVerseKey ==
                                                   ayah.verseKey
                                           ? const Color(0xFFB54434)
@@ -1117,7 +1172,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                               audio.activeVerseKey ==
                                                   ayah.verseKey
                                           ? tr('إيقاف الآية', 'Stop ayah')
-                                          : tr(tr('تلاوة الآية كاملة', 'Play Full Ayah'), 'Recite full ayah'),
+                                          : tr(
+                                              tr(
+                                                'تلاوة الآية كاملة',
+                                                'Play Full Ayah',
+                                              ),
+                                              'Recite full ayah',
+                                            ),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w800,
                                       ),
@@ -1131,29 +1192,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               borderRadius: BorderRadius.circular(8),
                               onTap: () =>
                                   widget.controller.setAutoPlayAyahAfterWord(
-                                !widget.controller.autoPlayAyahAfterWord,
-                              ),
+                                    !widget.controller.autoPlayAyahAfterWord,
+                                  ),
                               child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 2,
+                                ),
                                 child: Row(
                                   children: [
                                     Icon(
                                       widget.controller.autoPlayAyahAfterWord
                                           ? Icons.check_box_rounded
                                           : Icons
-                                              .check_box_outline_blank_rounded,
+                                                .check_box_outline_blank_rounded,
                                       size: 18,
-                                      color: widget
-                                              .controller.autoPlayAyahAfterWord
+                                      color:
+                                          widget
+                                              .controller
+                                              .autoPlayAyahAfterWord
                                           ? const Color(0xFF2B8A62)
                                           : theme.secondaryTextColor,
                                     ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
-                                        tr('تشغيل تلاوة الآية كاملة تلقائياً بعد انتهاء نطق الكلمة (${widget.controller.selectedReciter.shortDisplayName})',
-                                            'Auto-play the full ayah after the word finishes (${widget.controller.selectedReciter.shortDisplayName})'),
+                                        tr(
+                                          'تشغيل تلاوة الآية كاملة تلقائياً بعد انتهاء نطق الكلمة (${widget.controller.selectedReciter.shortDisplayName})',
+                                          'Auto-play the full ayah after the word finishes (${widget.controller.selectedReciter.shortDisplayName})',
+                                        ),
                                         style: TextStyle(
                                           color: theme.secondaryTextColor,
                                           fontSize: 11.5,
@@ -1195,8 +1261,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: theme.ornamentPrimary,
-                          backgroundColor:
-                              theme.ornamentPrimary.withValues(alpha: 0.08),
+                          backgroundColor: theme.ornamentPrimary.withValues(
+                            alpha: 0.08,
+                          ),
                           side: BorderSide(
                             color: theme.ornamentPrimary,
                             width: 1.4,
@@ -1213,7 +1280,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             controller: widget.controller,
                             verseKey: ayah.verseKey,
                             initialWord: tappedWord,
-                            initialTabIndex: tappedWord != null &&
+                            initialTabIndex:
+                                tappedWord != null &&
                                     !tappedWord.isStandaloneVerseMarker
                                 ? 0
                                 : 1,
@@ -1221,8 +1289,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         },
                         icon: const Icon(Icons.menu_book_rounded, size: 20),
                         label: Text(
-                          tr('معاني الكلمات وتفسير الآية (المختصر والتفصيلي)',
-                              'Word meanings & ayah tafsir (brief and detailed)'),
+                          tr(
+                            'معاني الكلمات وتفسير الآية (المختصر والتفصيلي)',
+                            'Word meanings & ayah tafsir (brief and detailed)',
+                          ),
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
@@ -1254,18 +1324,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               ..hideCurrentSnackBar()
                               ..showSnackBar(
                                 SnackBar(
-                                  duration:
-                                      const Duration(milliseconds: 1800),
+                                  duration: const Duration(milliseconds: 1800),
                                   behavior: SnackBarBehavior.floating,
                                   backgroundColor: theme.hudSurface,
                                   content: Directionality(
                                     textDirection: L10n.dir,
                                     child: Text(
                                       prev != null
-                                          ? tr('تم حذف علامة الختمة والعودة للموضع السابق: سورة ${prev.surahNameArabic} آية ${L10n.n(prev.ayahNumber)}',
-                                              'Khatma mark removed and returned to the previous position: Surah ${_enSurah(prev.surahId, prev.surahNameArabic)} ayah ${L10n.n(prev.ayahNumber)}')
-                                          : tr('تم حذف علامة الختمة الحالية',
-                                              'Current khatma mark removed'),
+                                          ? tr(
+                                              'تم حذف علامة الختمة والعودة للموضع السابق: سورة ${prev.surahNameArabic} آية ${L10n.n(prev.ayahNumber)}',
+                                              'Khatma mark removed and returned to the previous position: Surah ${_enSurah(prev.surahId, prev.surahNameArabic)} ayah ${L10n.n(prev.ayahNumber)}',
+                                            )
+                                          : tr(
+                                              'تم حذف علامة الختمة الحالية',
+                                              'Current khatma mark removed',
+                                            ),
                                       style: TextStyle(color: theme.hudText),
                                     ),
                                   ),
@@ -1274,8 +1347,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           },
                           icon: const Icon(Icons.undo_rounded, size: 20),
                           label: Text(
-                            tr('حذف علامة الختمة (العودة للموضع السابق)',
-                                'Remove khatma mark (return to previous)'),
+                            tr(
+                              'حذف علامة الختمة (العودة للموضع السابق)',
+                              'Remove khatma mark (return to previous)',
+                            ),
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
@@ -1291,7 +1366,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             ),
                           ),
                           onPressed: () async {
-                            final isLastAyah = ayah.id >= 6236 ||
+                            final isLastAyah =
+                                ayah.id >= 6236 ||
                                 (ayah.surahId == 114 && ayah.ayahNumber == 6);
                             if (activeKhatma == null && isLastAyah) {
                               Navigator.of(sheetCtx).pop();
@@ -1313,8 +1389,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               return;
                             }
 
-                            final res =
-                                await widget.controller.markKhatmaAyah(ayah);
+                            final res = await widget.controller.markKhatmaAyah(
+                              ayah,
+                            );
                             if (!sheetCtx.mounted) return;
                             Navigator.of(sheetCtx).pop();
                             if (!context.mounted) return;
@@ -1331,15 +1408,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 ..hideCurrentSnackBar()
                                 ..showSnackBar(
                                   SnackBar(
-                                    duration:
-                                        const Duration(milliseconds: 1600),
+                                    duration: const Duration(
+                                      milliseconds: 1600,
+                                    ),
                                     behavior: SnackBarBehavior.floating,
                                     backgroundColor: theme.hudSurface,
                                     content: Directionality(
                                       textDirection: L10n.dir,
                                       child: Text(
-                                        tr('تم تحديث علامة ${res.khatma.displayTitle} عند سورة ${ayah.surahNameArabic} آية ${L10n.n(ayah.ayahNumber)}',
-                                            '${res.khatma.displayTitle} mark updated at Surah $ayahSurahName ayah ${L10n.n(ayah.ayahNumber)}'),
+                                        tr(
+                                          'تم تحديث علامة ${res.khatma.displayTitle} عند سورة ${ayah.surahNameArabic} آية ${L10n.n(ayah.ayahNumber)}',
+                                          '${res.khatma.displayTitle} mark updated at Surah $ayahSurahName ayah ${L10n.n(ayah.ayahNumber)}',
+                                        ),
                                         style: TextStyle(color: theme.hudText),
                                       ),
                                     ),
@@ -1350,10 +1430,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           icon: const Icon(Icons.flag_rounded, size: 20),
                           label: Text(
                             activeKhatma != null
-                                ? tr('تحديد كعلامة الختمة الحالية (#${L10n.n(activeKhatma.serialNumber)})',
-                                    'Set as current khatma mark (#${L10n.n(activeKhatma.serialNumber)})')
-                                : tr('بدء ختمة جديدة وتحديد هذه الآية كعلامة',
-                                    'Start a new khatma and mark this ayah'),
+                                ? tr(
+                                    'تحديد كعلامة الختمة الحالية (#${L10n.n(activeKhatma.serialNumber)})',
+                                    'Set as current khatma mark (#${L10n.n(activeKhatma.serialNumber)})',
+                                  )
+                                : tr(
+                                    'بدء ختمة جديدة وتحديد هذه الآية كعلامة',
+                                    'Start a new khatma and mark this ayah',
+                                  ),
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
@@ -1374,8 +1458,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                       : theme.ornamentPrimary,
                                   width: 1.3,
                                 ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1390,20 +1475,32 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                   ..hideCurrentSnackBar()
                                   ..showSnackBar(
                                     SnackBar(
-                                      duration:
-                                          const Duration(milliseconds: 1400),
+                                      duration: const Duration(
+                                        milliseconds: 1400,
+                                      ),
                                       behavior: SnackBarBehavior.floating,
                                       backgroundColor: theme.hudSurface,
                                       content: Directionality(
                                         textDirection: L10n.dir,
                                         child: Text(
                                           added
-                                              ? tr(tr('تم حفظ الآية في العلامات المرجعية', 'Ayah bookmarked'),
-                                                  'Ayah saved to bookmarks')
-                                              : tr(tr('تم إزالة الآية من العلامات المرجعية', 'Ayah removed from bookmarks'),
-                                                  'Ayah removed from bookmarks'),
-                                          style:
-                                              TextStyle(color: theme.hudText),
+                                              ? tr(
+                                                  tr(
+                                                    'تم حفظ الآية في العلامات المرجعية',
+                                                    'Ayah bookmarked',
+                                                  ),
+                                                  'Ayah saved to bookmarks',
+                                                )
+                                              : tr(
+                                                  tr(
+                                                    'تم إزالة الآية من العلامات المرجعية',
+                                                    'Ayah removed from bookmarks',
+                                                  ),
+                                                  'Ayah removed from bookmarks',
+                                                ),
+                                          style: TextStyle(
+                                            color: theme.hudText,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1431,16 +1528,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: theme.ornamentPrimary,
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
                               onPressed: () async {
-                                final formatted =
-                                    tr('﴿ ${ayah.textUthmani} ﴾ [سورة ${ayah.surahNameArabic}: ${L10n.n(ayah.ayahNumber)}]',
-                                        '﴿ ${ayah.textUthmani} ﴾ [Surah $ayahSurahName: ${L10n.n(ayah.ayahNumber)}]');
+                                final formatted = tr(
+                                  '﴿ ${ayah.textUthmani} ﴾ [سورة ${ayah.surahNameArabic}: ${L10n.n(ayah.ayahNumber)}]',
+                                  '﴿ ${ayah.textUthmani} ﴾ [Surah $ayahSurahName: ${L10n.n(ayah.ayahNumber)}]',
+                                );
                                 await Clipboard.setData(
                                   ClipboardData(text: formatted),
                                 );
@@ -1450,17 +1549,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                   ..hideCurrentSnackBar()
                                   ..showSnackBar(
                                     SnackBar(
-                                      duration:
-                                          const Duration(milliseconds: 1500),
+                                      duration: const Duration(
+                                        milliseconds: 1500,
+                                      ),
                                       behavior: SnackBarBehavior.floating,
                                       backgroundColor: theme.hudSurface,
                                       content: Directionality(
                                         textDirection: L10n.dir,
                                         child: Text(
-                                          tr('تم نسخ الآية الكريمة إلى الحافظة',
-                                              'Ayah copied to clipboard'),
-                                          style:
-                                              TextStyle(color: theme.hudText),
+                                          tr(
+                                            'تم نسخ الآية الكريمة إلى الحافظة',
+                                            'Ayah copied to clipboard',
+                                          ),
+                                          style: TextStyle(
+                                            color: theme.hudText,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1490,5 +1593,108 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (mounted && widget.controller.selectedVerseKey == verseKey) {
       widget.controller.selectVerse(null);
     }
+  }
+}
+
+/// Continuous, smooth vertical scrolling through all 604 Mushaf pages.
+/// Every page keeps its full 15-line layout; pages flow one after another.
+class _VerticalMushafScroller extends StatefulWidget {
+  final MushafController controller;
+  final bool locked;
+  final Widget Function(BuildContext context, int pageNumber) pageBuilder;
+
+  const _VerticalMushafScroller({
+    required this.controller,
+    required this.locked,
+    required this.pageBuilder,
+  });
+
+  @override
+  State<_VerticalMushafScroller> createState() =>
+      _VerticalMushafScrollerState();
+}
+
+class _VerticalMushafScrollerState extends State<_VerticalMushafScroller> {
+  ScrollController? _scroll;
+  double _extent = 0;
+  bool _syncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.verticalJumpHandler = _jumpToPage;
+  }
+
+  @override
+  void dispose() {
+    if (widget.controller.verticalJumpHandler == _jumpToPage) {
+      widget.controller.verticalJumpHandler = null;
+    }
+    _scroll?.removeListener(_onScroll);
+    _scroll?.dispose();
+    super.dispose();
+  }
+
+  void _jumpToPage(int page) {
+    final scroll = _scroll;
+    if (scroll == null || !scroll.hasClients || _extent <= 0) return;
+    _syncing = true;
+    scroll.jumpTo((page - 1) * _extent);
+    _syncing = false;
+  }
+
+  void _onScroll() {
+    if (_syncing || _extent <= 0) return;
+    final scroll = _scroll!;
+    final idx = ((scroll.offset + _extent * 0.5) / _extent).floor().clamp(
+      0,
+      603,
+    );
+    widget.controller.onPageChanged(idx);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+        final mode = widget.controller.fontScaleMode;
+        final factor = mode == MushafFontScaleMode.pinchToZoom
+            ? 1.0
+            : mode.scaleFactor;
+        final extent = w > h
+            ? w * MushafPageWidget.landscapePageAspect * factor
+            : h * factor;
+
+        final page = widget.controller.currentPage;
+        if (_scroll == null) {
+          _scroll = ScrollController(initialScrollOffset: (page - 1) * extent)
+            ..addListener(_onScroll);
+        } else if ((extent - _extent).abs() > 0.5) {
+          // Rotation or zoom change: keep the same page in view.
+          _syncing = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (_scroll!.hasClients) _scroll!.jumpTo((page - 1) * extent);
+            _syncing = false;
+          });
+        }
+        _extent = extent;
+
+        return ListView.builder(
+          controller: _scroll,
+          itemExtent: extent,
+          itemCount: 604,
+          physics: widget.locked
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+          itemBuilder: (context, index) =>
+              widget.pageBuilder(context, index + 1),
+        );
+      },
+    );
   }
 }

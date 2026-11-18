@@ -19,6 +19,17 @@ class MushafPageWidget extends StatefulWidget {
   final ValueChanged<bool>? onZoomChanged;
   final VoidCallback? onCompleteKhatmaTap;
 
+  /// True when the page lives inside the continuous vertical-scroll list,
+  /// which already gives it its full height (so no inner scroll view).
+  final bool scrollEmbedded;
+
+  /// Height/width ratio of a Mushaf page, used in landscape layout.
+  static const double landscapePageAspect = 1.5;
+
+  /// Font multiplier so a full-width landscape page uses larger glyphs.
+  static double landscapeFontBoost(double width) =>
+      (width / 400.0).clamp(1.0, 2.6);
+
   const MushafPageWidget({
     super.key,
     required this.pageNumber,
@@ -29,6 +40,7 @@ class MushafPageWidget extends StatefulWidget {
     this.onVerseMarkerTap,
     this.onZoomChanged,
     this.onCompleteKhatmaTap,
+    this.scrollEmbedded = false,
   });
 
   @override
@@ -98,28 +110,31 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         final cached = widget.controller.currentPage == widget.pageNumber
             ? widget.controller.currentPageData
             : null;
-        final fontLoaded =
-            QpcFontLoaderService.instance.isPageFontLoaded(widget.pageNumber);
+        final fontLoaded = QpcFontLoaderService.instance.isPageFontLoaded(
+          widget.pageNumber,
+        );
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.controller.toggleHud,
           onDoubleTap: scaleMode == MushafFontScaleMode.pinchToZoom
               ? () {
-                  final currentScale =
-                      _zoomController.value.getMaxScaleOnAxis();
+                  final currentScale = _zoomController.value
+                      .getMaxScaleOnAxis();
                   if (currentScale > 1.05) {
                     _zoomController.value = Matrix4.identity();
                   } else {
-                    _zoomController.value =
-                        Matrix4.diagonal3Values(1.5, 1.5, 1.0);
+                    _zoomController.value = Matrix4.diagonal3Values(
+                      1.5,
+                      1.5,
+                      1.0,
+                    );
                   }
                 }
               : null,
           child: Container(
             color: theme.scaffoldBackground,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
+            padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
             child: FutureBuilder<MushafPageData>(
               initialData: (cached != null && fontLoaded) ? cached : null,
               future: _loadFuture,
@@ -130,7 +145,74 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                 }
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    if (scaleMode == MushafFontScaleMode.pinchToZoom) {
+                    final isLandscape =
+                        constraints.maxWidth > constraints.maxHeight;
+                    // In the vertical list the page box is taller than wide
+                    // even in landscape, so check the device orientation.
+                    final screenLandscape =
+                        MediaQuery.orientationOf(context) ==
+                        Orientation.landscape;
+                    final boost = (isLandscape || screenLandscape)
+                        ? MushafPageWidget.landscapeFontBoost(
+                            constraints.maxWidth,
+                          )
+                        : 1.0;
+                    final isPinch =
+                        scaleMode == MushafFontScaleMode.pinchToZoom;
+                    final factor = isPinch ? 1.0 : scaleMode.scaleFactor;
+
+                    // Inside the vertical list the parent already sized us.
+                    if (widget.scrollEmbedded) {
+                      final frame = _buildPageFrame(
+                        context,
+                        pageData,
+                        theme,
+                        fontScale: factor * boost,
+                      );
+                      if (!isPinch) return frame;
+                      return InteractiveViewer(
+                        transformationController: _zoomController,
+                        minScale: 1.0,
+                        maxScale: 2.6,
+                        panEnabled: _isPinchZoomed,
+                        child: frame,
+                      );
+                    }
+
+                    if (isLandscape) {
+                      // Full-width page; scroll vertically within it.
+                      final pageHeight =
+                          constraints.maxWidth *
+                          MushafPageWidget.landscapePageAspect *
+                          factor;
+                      Widget page = SizedBox(
+                        width: constraints.maxWidth,
+                        height: pageHeight,
+                        child: _buildPageFrame(
+                          context,
+                          pageData,
+                          theme,
+                          fontScale: factor * boost,
+                        ),
+                      );
+                      if (isPinch) {
+                        page = InteractiveViewer(
+                          transformationController: _zoomController,
+                          minScale: 1.0,
+                          maxScale: 2.6,
+                          panEnabled: _isPinchZoomed,
+                          child: page,
+                        );
+                      }
+                      return SingleChildScrollView(
+                        physics: _isPinchZoomed
+                            ? const NeverScrollableScrollPhysics()
+                            : const BouncingScrollPhysics(),
+                        child: page,
+                      );
+                    }
+
+                    if (isPinch) {
                       return InteractiveViewer(
                         transformationController: _zoomController,
                         minScale: 1.0,
@@ -150,7 +232,6 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                       );
                     }
 
-                    final factor = scaleMode.scaleFactor;
                     if (factor <= 1.01) {
                       return _buildPageFrame(
                         context,
@@ -334,8 +415,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     required double fontScale,
   }) {
     _disposeRecognizers();
-    final fontFamily =
-        QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
+    final fontFamily = QpcFontLoaderService.fontFamilyForPage(
+      widget.pageNumber,
+    );
 
     final surahId = pageData.info.firstSurahId;
     final surahInfo = widget.controller.getSurahById(surahId);
@@ -364,13 +446,17 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       0.76,
       0.52,
     ];
-    final chordProfile =
-        widget.pageNumber == 1 ? page1ChordFactors : page2ChordFactors;
+    final chordProfile = widget.pageNumber == 1
+        ? page1ChordFactors
+        : page2ChordFactors;
 
     final surahTitleAr = surahInfo != null
         ? 'سُورَةُ ${surahInfo.nameArabic}'
-        : (widget.pageNumber == 1 ? 'سُورَةُ الفَاتِحَةِ' : 'سُورَةُ البَقَرَةِ');
-    final revelationAr = surahInfo?.revelationArabic ??
+        : (widget.pageNumber == 1
+              ? 'سُورَةُ الفَاتِحَةِ'
+              : 'سُورَةُ البَقَرَةِ');
+    final revelationAr =
+        surahInfo?.revelationArabic ??
         (widget.pageNumber == 1 ? 'مكية' : 'مدنية');
     final ayahCountAr = ArabicUtils.toArabicDigits(
       surahInfo?.ayahCount ?? (widget.pageNumber == 1 ? 7 : 286),
@@ -378,8 +464,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableInnerWidth =
-            (constraints.maxWidth - 48.0).clamp(180.0, 600.0);
+        final availableInnerWidth = (constraints.maxWidth - 48.0).clamp(
+          180.0,
+          600.0,
+        );
         final circleMaxWidth = availableInnerWidth * 0.94;
 
         return CustomPaint(
@@ -419,33 +507,31 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List<Widget>.generate(
-                          contentLines.length,
-                          (idx) {
-                            final line = contentLines[idx];
-                            final factor = idx < chordProfile.length
-                                ? chordProfile[idx]
-                                : 0.75;
-                            final targetLineWidth = circleMaxWidth * factor;
+                        children: List<Widget>.generate(contentLines.length, (
+                          idx,
+                        ) {
+                          final line = contentLines[idx];
+                          final factor = idx < chordProfile.length
+                              ? chordProfile[idx]
+                              : 0.75;
+                          final targetLineWidth = circleMaxWidth * factor;
 
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 4.5),
-                              child: Center(
-                                child: SizedBox(
-                                  width: targetLineWidth,
-                                  child: line.isBasmala
-                                      ? _buildCircularBasmalaLine(theme)
-                                      : _buildCircularTextLine(
-                                          line: line,
-                                          fontFamily: fontFamily,
-                                          theme: theme,
-                                        ),
-                                ),
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.5),
+                            child: Center(
+                              child: SizedBox(
+                                width: targetLineWidth,
+                                child: line.isBasmala
+                                    ? _buildCircularBasmalaLine(theme)
+                                    : _buildCircularTextLine(
+                                        line: line,
+                                        fontFamily: fontFamily,
+                                        theme: theme,
+                                      ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        }),
                       ),
                     ),
                   ),
@@ -496,8 +582,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     final selectedVerse = widget.controller.selectedVerseKey;
     final playingAyahKey = widget.controller.playingAyahVerseKey;
     final selectedWordLoc = widget.controller.selectedWordLocation;
-    final singleTapEnabled =
-        widget.controller.enableSingleTapWordPronunciation;
+    final singleTapEnabled = widget.controller.enableSingleTapWordPronunciation;
     final isIndoPak = widget.controller.isIndoPakScript;
     final effectiveFont = isIndoPak ? 'IndoPak' : fontFamily;
     final effectiveWordSpacing = isIndoPak ? 1.5 : wordSpacing;
@@ -510,10 +595,12 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       final isSelectedAyah =
           selectedVerse == word.verseKey || playingAyahKey == word.verseKey;
       final isSelectedWord = selectedWordLoc == word.location;
-      final isKhatmaMark =
-          widget.controller.isKhatmaCurrentVerse(word.verseKey);
-      final isBookmarkedAyah =
-          widget.controller.isAyahBookmarked(word.verseKey);
+      final isKhatmaMark = widget.controller.isKhatmaCurrentVerse(
+        word.verseKey,
+      );
+      final isBookmarkedAyah = widget.controller.isAyahBookmarked(
+        word.verseKey,
+      );
 
       Color? baseBgColor;
       if (isSelectedAyah) {
@@ -521,8 +608,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       } else if (isKhatmaMark) {
         baseBgColor = const Color(0x3D2B8A62);
       } else if (isBookmarkedAyah) {
-        baseBgColor =
-            widget.controller.savedAyahHighlightColor.withValues(alpha: 0.28);
+        baseBgColor = widget.controller.savedAyahHighlightColor.withValues(
+          alpha: 0.28,
+        );
       }
 
       final Color wordBgColor = isSelectedWord
@@ -532,10 +620,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       final Color wordTextColor = isSelectedWord
           ? theme.ornamentPrimary
           : isSelectedAyah
-              ? theme.ornamentPrimary
-              : isKhatmaMark
-                  ? const Color(0xFF1F7A53)
-                  : theme.glyphColor;
+          ? theme.ornamentPrimary
+          : isKhatmaMark
+          ? const Color(0xFF1F7A53)
+          : theme.glyphColor;
 
       if (word.isStandaloneVerseMarker) {
         final markerRecognizer = _WordTapAndLongPressRecognizer(
@@ -564,8 +652,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               color: isSelectedAyah
                   ? theme.ornamentPrimary
                   : isKhatmaMark
-                      ? const Color(0xFF1F7A53)
-                      : theme.glyphColor,
+                  ? const Color(0xFF1F7A53)
+                  : theme.glyphColor,
               backgroundColor: baseBgColor,
             ),
           ),
@@ -610,8 +698,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               height: lineHeight,
               wordSpacing: effectiveWordSpacing,
               color: wordTextColor,
-              backgroundColor:
-                  isSelectedWord ? wordBgColor : baseBgColor,
+              backgroundColor: isSelectedWord ? wordBgColor : baseBgColor,
             ),
           ),
         );
@@ -628,8 +715,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               color: isSelectedAyah
                   ? theme.ornamentPrimary
                   : isKhatmaMark
-                      ? const Color(0xFF1F7A53)
-                      : theme.glyphColor,
+                  ? const Color(0xFF1F7A53)
+                  : theme.glyphColor,
               backgroundColor: baseBgColor,
             ),
           ),
@@ -659,8 +746,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               height: lineHeight,
               wordSpacing: effectiveWordSpacing,
               color: wordTextColor,
-              backgroundColor:
-                  isSelectedWord ? wordBgColor : baseBgColor,
+              backgroundColor: isSelectedWord ? wordBgColor : baseBgColor,
             ),
           ),
         );
@@ -723,10 +809,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _OpeningCartoucheBadge(
-                  text: revelationAr,
-                  theme: theme,
-                ),
+                _OpeningCartoucheBadge(text: revelationAr, theme: theme),
                 Expanded(
                   child: Center(
                     child: FittedBox(
@@ -745,10 +828,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                     ),
                   ),
                 ),
-                _OpeningCartoucheBadge(
-                  text: 'الجُزْءُ $juzAr',
-                  theme: theme,
-                ),
+                _OpeningCartoucheBadge(text: 'الجُزْءُ $juzAr', theme: theme),
               ],
             ),
           ),
@@ -764,23 +844,26 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     required double fontScale,
   }) {
     _disposeRecognizers();
-    final fontFamily =
-        QpcFontLoaderService.fontFamilyForPage(widget.pageNumber);
+    final fontFamily = QpcFontLoaderService.fontFamilyForPage(
+      widget.pageNumber,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
       child: Column(
-        children: pageData.lines.map((line) {
-          return Expanded(
-            flex: line.isSurahHeader ? 13 : 10,
-            child: _buildStandardLineSlot(
-              line,
-              fontFamily,
-              theme,
-              fontScale: fontScale,
-            ),
-          );
-        }).toList(growable: false),
+        children: pageData.lines
+            .map((line) {
+              return Expanded(
+                flex: line.isSurahHeader ? 13 : 10,
+                child: _buildStandardLineSlot(
+                  line,
+                  fontFamily,
+                  theme,
+                  fontScale: fontScale,
+                ),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }
@@ -887,18 +970,12 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             ),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF1F7A53),
-                  Color(0xFF2B8A62),
-                ],
+                colors: [Color(0xFF1F7A53), Color(0xFF2B8A62)],
                 begin: Alignment.centerRight,
                 end: Alignment.centerLeft,
               ),
               borderRadius: BorderRadius.circular(12.0),
-              border: Border.all(
-                color: theme.ornamentPrimary,
-                width: 1.5,
-              ),
+              border: Border.all(color: theme.ornamentPrimary, width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF2B8A62).withValues(alpha: 0.28),
@@ -959,7 +1036,6 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
-
   static String _toEasternArabicDigits(int number) {
     const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     final s = number.toString();
@@ -975,7 +1051,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   static String _toIndoPakWord(String uthmani) {
     return uthmani
         .replaceAll('\u0671', '\u0627') // Alef Wasla -> Alef
-        .replaceAll('\u0640\u0670', '\u0670') // Tatweel + dagger alef -> standing fatha
+        .replaceAll(
+          '\u0640\u0670',
+          '\u0670',
+        ) // Tatweel + dagger alef -> standing fatha
         .replaceAll('\u0652', '\u06E1') // Sukun -> Indo-Pak jazm
         .replaceAll('\u06DF', '') // Remove Uthmani small high rounded zero
         .replaceAll('\u06E0', '');
@@ -990,10 +1069,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           decoration: BoxDecoration(
             color: theme.ornamentFill,
             borderRadius: BorderRadius.circular(14.0),
-            border: Border.all(
-              color: theme.pageInnerBorder,
-              width: 1.2,
-            ),
+            border: Border.all(color: theme.pageInnerBorder, width: 1.2),
           ),
           child: Text(
             ArabicUtils.toArabicDigits(pageNumber),
@@ -1115,10 +1191,7 @@ class _OpeningCartoucheBadge extends StatelessWidget {
   final String text;
   final MushafThemeData theme;
 
-  const _OpeningCartoucheBadge({
-    required this.text,
-    required this.theme,
-  });
+  const _OpeningCartoucheBadge({required this.text, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -1464,10 +1537,8 @@ class _WordTapAndLongPressRecognizer extends PrimaryPointerGestureRecognizer {
   final VoidCallback? onLongPress;
   bool _longPressFired = false;
 
-  _WordTapAndLongPressRecognizer({
-    this.onTap,
-    this.onLongPress,
-  }) : super(deadline: kLongPressTimeout);
+  _WordTapAndLongPressRecognizer({this.onTap, this.onLongPress})
+    : super(deadline: kLongPressTimeout);
 
   @override
   void addAllowedPointer(PointerDownEvent event) {

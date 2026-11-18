@@ -8,10 +8,7 @@ import '../theme/mushaf_theme.dart';
 class SettingsSheet extends StatelessWidget {
   final MushafController controller;
 
-  const SettingsSheet({
-    super.key,
-    required this.controller,
-  });
+  const SettingsSheet({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +26,9 @@ class SettingsSheet extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: theme.pageBackground,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               border: Border.all(color: theme.pageOuterBorder, width: 1.4),
             ),
             child: SafeArea(
@@ -61,7 +59,10 @@ class SettingsSheet extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              tr('إعدادات العرض والقراءة', 'Display & Reading Settings'),
+                              tr(
+                                'إعدادات العرض والقراءة',
+                                'Display & Reading Settings',
+                              ),
                               style: TextStyle(
                                 color: theme.glyphColor,
                                 fontSize: 18,
@@ -139,8 +140,9 @@ class SettingsSheet extends StatelessWidget {
                                       onTap: () =>
                                           controller.setLanguage(lang.val),
                                       child: AnimatedContainer(
-                                        duration:
-                                            const Duration(milliseconds: 180),
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 12,
                                           vertical: 12,
@@ -148,19 +150,20 @@ class SettingsSheet extends StatelessWidget {
                                         decoration: BoxDecoration(
                                           color: controller.language == lang.val
                                               ? theme.ornamentPrimary
-                                                  .withValues(alpha: 0.16)
+                                                    .withValues(alpha: 0.16)
                                               : theme.ornamentFill,
-                                          borderRadius:
-                                              BorderRadius.circular(14),
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
                                           border: Border.all(
                                             color:
                                                 controller.language == lang.val
-                                                    ? theme.ornamentPrimary
-                                                    : theme.pageInnerBorder,
+                                                ? theme.ornamentPrimary
+                                                : theme.pageInnerBorder,
                                             width:
                                                 controller.language == lang.val
-                                                    ? 2.0
-                                                    : 1.0,
+                                                ? 2.0
+                                                : 1.0,
                                           ),
                                         ),
                                         child: Row(
@@ -171,9 +174,10 @@ class SettingsSheet extends StatelessWidget {
                                               controller.language == lang.val
                                                   ? Icons.check_circle_rounded
                                                   : Icons
-                                                      .radio_button_off_rounded,
+                                                        .radio_button_off_rounded,
                                               size: 19,
-                                              color: controller.language ==
+                                              color:
+                                                  controller.language ==
                                                       lang.val
                                                   ? theme.ornamentPrimary
                                                   : theme.secondaryTextColor,
@@ -221,46 +225,73 @@ class SettingsSheet extends StatelessWidget {
                               for (final scr in [
                                 (
                                   val: MushafScript.uthmani,
-                                  label: tr('رسم المدينة', 'Madinah Uthmani', 'عثمانی رسم الخط'),
+                                  label: tr(
+                                    'رسم المدينة',
+                                    'Madinah Uthmani',
+                                    'عثمانی رسم الخط',
+                                  ),
                                 ),
                                 (
                                   val: MushafScript.indoPak,
-                                  label: tr('نستعلیق (برصغیر)', 'Indo-Pak', 'نستعلیق (برصغیر)'),
+                                  label: tr(
+                                    'نستعلیق (برصغیر)',
+                                    'Indo-Pak',
+                                    'نستعلیق (برصغیر)',
+                                  ),
                                 ),
                               ])
                                 Expanded(
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4.0,
+                                    ),
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(14),
-                                      onTap: () => controller.setMushafScript(scr.val),
+                                      onTap: () =>
+                                          controller.setMushafScript(scr.val),
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 180),
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 10,
                                           vertical: 12,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: controller.mushafScript == scr.val
-                                              ? theme.ornamentPrimary.withValues(alpha: 0.16)
+                                          color:
+                                              controller.mushafScript == scr.val
+                                              ? theme.ornamentPrimary
+                                                    .withValues(alpha: 0.16)
                                               : theme.ornamentFill,
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
                                           border: Border.all(
-                                            color: controller.mushafScript == scr.val
+                                            color:
+                                                controller.mushafScript ==
+                                                    scr.val
                                                 ? theme.ornamentPrimary
                                                 : theme.pageInnerBorder,
-                                            width: controller.mushafScript == scr.val ? 2.0 : 1.0,
+                                            width:
+                                                controller.mushafScript ==
+                                                    scr.val
+                                                ? 2.0
+                                                : 1.0,
                                           ),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Icon(
                                               controller.mushafScript == scr.val
                                                   ? Icons.check_circle_rounded
-                                                  : Icons.radio_button_off_rounded,
+                                                  : Icons
+                                                        .radio_button_off_rounded,
                                               size: 18,
-                                              color: controller.mushafScript == scr.val
+                                              color:
+                                                  controller.mushafScript ==
+                                                      scr.val
                                                   ? theme.ornamentPrimary
                                                   : theme.secondaryTextColor,
                                             ),
@@ -291,7 +322,10 @@ class SettingsSheet extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                tr('حجم الخط وطريقة التكبير', 'Font Size & Zoom Mode'),
+                                tr(
+                                  'حجم الخط وطريقة التكبير',
+                                  'Font Size & Zoom Mode',
+                                ),
                                 style: TextStyle(
                                   color: theme.glyphColor,
                                   fontSize: 15.5,
@@ -304,12 +338,16 @@ class SettingsSheet extends StatelessWidget {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: theme.ornamentPrimary
-                                      .withValues(alpha: 0.14),
+                                  color: theme.ornamentPrimary.withValues(
+                                    alpha: 0.14,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  tr('التزام تام بـ ١٥ سطراً', 'Strict 15-line layout'),
+                                  tr(
+                                    'التزام تام بـ ١٥ سطراً',
+                                    'Strict 15-line layout',
+                                  ),
                                   style: TextStyle(
                                     color: theme.ornamentPrimary,
                                     fontSize: 11.5,
@@ -321,7 +359,10 @@ class SettingsSheet extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            tr('جميع الخيارات تحافظ على تنسيق مصحف المدينة النبوية (١٥ سطراً في كل صفحة دون تغيير مواضع الكلمات).', 'All options preserve the exact 15-line Madinah Mushaf page and line layout.'),
+                            tr(
+                              'جميع الخيارات تحافظ على تنسيق مصحف المدينة النبوية (١٥ سطراً في كل صفحة دون تغيير مواضع الكلمات).',
+                              'All options preserve the exact 15-line Madinah Mushaf page and line layout.',
+                            ),
                             style: TextStyle(
                               color: theme.secondaryTextColor,
                               fontSize: 12.5,
@@ -354,90 +395,108 @@ class SettingsSheet extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           Row(
-                            children: MushafThemeData.all.map((themeOption) {
-                              final isSelected =
-                                  themeOption.type == theme.type;
-                              return Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4.0,
-                                  ),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(14),
-                                    onTap: () =>
-                                        controller.setTheme(themeOption.type),
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 180),
+                            children: MushafThemeData.all
+                                .map((themeOption) {
+                                  final isSelected =
+                                      themeOption.type == theme.type;
+                                  return Expanded(
+                                    child: Padding(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 12,
+                                        horizontal: 4.0,
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: themeOption.pageBackground,
+                                      child: InkWell(
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? theme.ornamentPrimary
-                                              : theme.pageInnerBorder,
-                                          width: isSelected ? 2.2 : 1.0,
+                                        onTap: () => controller.setTheme(
+                                          themeOption.type,
                                         ),
-                                        boxShadow: isSelected
-                                            ? [
-                                                BoxShadow(
-                                                  color: theme.ornamentPrimary
-                                                      .withValues(alpha: 0.20),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ]
-                                            : null,
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
+                                        child: AnimatedContainer(
+                                          duration: const Duration(
+                                            milliseconds: 180,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: themeOption.pageBackground,
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? theme.ornamentPrimary
+                                                  : theme.pageInnerBorder,
+                                              width: isSelected ? 2.2 : 1.0,
+                                            ),
+                                            boxShadow: isSelected
+                                                ? [
+                                                    BoxShadow(
+                                                      color: theme
+                                                          .ornamentPrimary
+                                                          .withValues(
+                                                            alpha: 0.20,
+                                                          ),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                          child: Column(
                                             children: [
-                                              Icon(
-                                                isSelected
-                                                    ? Icons.check_circle_rounded
-                                                    : themeOption.icon,
-                                                size: 18,
-                                                color:
-                                                    themeOption.ornamentPrimary,
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    isSelected
+                                                        ? Icons
+                                                              .check_circle_rounded
+                                                        : themeOption.icon,
+                                                    size: 18,
+                                                    color: themeOption
+                                                        .ornamentPrimary,
+                                                  ),
+                                                  const SizedBox(width: 5),
+                                                  Text(
+                                                    'أ ب ج',
+                                                    style: TextStyle(
+                                                      color: themeOption
+                                                          .glyphColor,
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              const SizedBox(width: 5),
+                                              const SizedBox(height: 6),
                                               Text(
-                                                'أ ب ج',
+                                                tr(
+                                                  themeOption.arabicLabel,
+                                                  themeOption.name,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: themeOption.glyphColor,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 12.5,
+                                                  fontWeight: isSelected
+                                                      ? FontWeight.w800
+                                                      : FontWeight.w600,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            tr(themeOption.arabicLabel, themeOption.name),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: themeOption.glyphColor,
-                                              fontSize: 12.5,
-                                              fontWeight: isSelected
-                                                  ? FontWeight.w800
-                                                  : FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                              );
-                            }).toList(growable: false),
+                                  );
+                                })
+                                .toList(growable: false),
                           ),
 
                           const SizedBox(height: 18),
@@ -451,7 +510,10 @@ class SettingsSheet extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                tr('نطق الكلمات وتلاوة الآيات', 'Word Pronunciation & Ayah Recitation'),
+                                tr(
+                                  'نطق الكلمات وتلاوة الآيات',
+                                  'Word Pronunciation & Ayah Recitation',
+                                ),
                                 style: TextStyle(
                                   color: theme.glyphColor,
                                   fontSize: 15.5,
@@ -481,7 +543,10 @@ class SettingsSheet extends StatelessWidget {
                                   onChanged: controller
                                       .setEnableSingleTapWordPronunciation,
                                   title: Text(
-                                    tr('نطق الكلمة عند اللمس الفردي', 'Pronounce word on single tap'),
+                                    tr(
+                                      'نطق الكلمة عند اللمس الفردي',
+                                      'Pronounce word on single tap',
+                                    ),
                                     style: TextStyle(
                                       color: theme.glyphColor,
                                       fontSize: 14.5,
@@ -489,7 +554,10 @@ class SettingsSheet extends StatelessWidget {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    tr('لمس أي كلمة في المصحف ينطقها فوراً (ويمكن دائماً استخدام الضغط المطوّل على الكلمة)', 'Tap any word to hear it immediately (long-press is always available)'),
+                                    tr(
+                                      'لمس أي كلمة في المصحف ينطقها فوراً (ويمكن دائماً استخدام الضغط المطوّل على الكلمة)',
+                                      'Tap any word to hear it immediately (long-press is always available)',
+                                    ),
                                     style: TextStyle(
                                       color: theme.secondaryTextColor,
                                       fontSize: 12,
@@ -498,16 +566,21 @@ class SettingsSheet extends StatelessWidget {
                                 ),
                                 Divider(
                                   height: 1,
-                                  color: theme.pageInnerBorder
-                                      .withValues(alpha: 0.6),
+                                  color: theme.pageInnerBorder.withValues(
+                                    alpha: 0.6,
+                                  ),
                                 ),
                                 SwitchListTile.adaptive(
                                   contentPadding: EdgeInsets.zero,
                                   activeThumbColor: const Color(0xFF2B8A62),
                                   value: controller.autoPlayAyahAfterWord,
-                                  onChanged: controller.setAutoPlayAyahAfterWord,
+                                  onChanged:
+                                      controller.setAutoPlayAyahAfterWord,
                                   title: Text(
-                                    tr('تلاوة الآية كاملة بعد نطق الكلمة', 'Auto-recite full ayah after word'),
+                                    tr(
+                                      'تلاوة الآية كاملة بعد نطق الكلمة',
+                                      'Auto-recite full ayah after word',
+                                    ),
                                     style: TextStyle(
                                       color: theme.glyphColor,
                                       fontSize: 14.5,
@@ -515,7 +588,10 @@ class SettingsSheet extends StatelessWidget {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    tr('تشغيل تلاوة الآية الكاملة تلقائياً فور انتهاء نطق الكلمة (أو عند لمس رقم الآية ﴿١﴾)', 'Automatically play the full ayah after pronouncing a word (or tap the ayah number)'),
+                                    tr(
+                                      'تشغيل تلاوة الآية الكاملة تلقائياً فور انتهاء نطق الكلمة (أو عند لمس رقم الآية ﴿١﴾)',
+                                      'Automatically play the full ayah after pronouncing a word (or tap the ayah number)',
+                                    ),
                                     style: TextStyle(
                                       color: theme.secondaryTextColor,
                                       fontSize: 12,
@@ -537,7 +613,10 @@ class SettingsSheet extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  tr('قارئ تلاوة الآية الكاملة:', 'Full Ayah Reciter:'),
+                                  tr(
+                                    'قارئ تلاوة الآية الكاملة:',
+                                    'Full Ayah Reciter:',
+                                  ),
                                   style: TextStyle(
                                     color: theme.glyphColor,
                                     fontSize: 13.5,
@@ -548,35 +627,38 @@ class SettingsSheet extends StatelessWidget {
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 8,
-                                  children: QuranReciter.values.map((reciter) {
-                                    final isSelected =
-                                        controller.selectedReciter == reciter;
-                                    return ChoiceChip(
-                                      label: Text(
-                                        reciter.shortDisplayName,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? Colors.white
-                                              : theme.glyphColor,
-                                          fontSize: 12.5,
-                                          fontWeight: isSelected
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                        ),
-                                      ),
-                                      selected: isSelected,
-                                      selectedColor: theme.ornamentPrimary,
-                                      backgroundColor: theme.pageBackground,
-                                      checkmarkColor: Colors.white,
-                                      side: BorderSide(
-                                        color: isSelected
-                                            ? theme.ornamentPrimary
-                                            : theme.pageInnerBorder,
-                                      ),
-                                      onSelected: (_) => controller
-                                          .setSelectedReciter(reciter),
-                                    );
-                                  }).toList(growable: false),
+                                  children: QuranReciter.values
+                                      .map((reciter) {
+                                        final isSelected =
+                                            controller.selectedReciter ==
+                                            reciter;
+                                        return ChoiceChip(
+                                          label: Text(
+                                            reciter.shortDisplayName,
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : theme.glyphColor,
+                                              fontSize: 12.5,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                            ),
+                                          ),
+                                          selected: isSelected,
+                                          selectedColor: theme.ornamentPrimary,
+                                          backgroundColor: theme.pageBackground,
+                                          checkmarkColor: Colors.white,
+                                          side: BorderSide(
+                                            color: isSelected
+                                                ? theme.ornamentPrimary
+                                                : theme.pageInnerBorder,
+                                          ),
+                                          onSelected: (_) => controller
+                                              .setSelectedReciter(reciter),
+                                        );
+                                      })
+                                      .toList(growable: false),
                                 ),
                               ],
                             ),
@@ -602,7 +684,10 @@ class SettingsSheet extends StatelessWidget {
                                   value: controller.askKhatmaOnStartup,
                                   onChanged: controller.setAskKhatmaOnStartup,
                                   title: Text(
-                                    tr('السؤال عن الختمة عند فتح التطبيق', 'Ask about Khatma on startup'),
+                                    tr(
+                                      'السؤال عن الختمة عند فتح التطبيق',
+                                      'Ask about Khatma on startup',
+                                    ),
                                     style: TextStyle(
                                       color: theme.glyphColor,
                                       fontSize: 14.5,
@@ -610,7 +695,10 @@ class SettingsSheet extends StatelessWidget {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    tr('عرض نافذة الاختيار عند بدء التشغيل (مواصلة الختمة الحالية، بدء ختمة جديدة، أو قراءة حرة)', 'Show session prompt at launch (continue Khatma, start new, or free reading)'),
+                                    tr(
+                                      'عرض نافذة الاختيار عند بدء التشغيل (مواصلة الختمة الحالية، بدء ختمة جديدة، أو قراءة حرة)',
+                                      'Show session prompt at launch (continue Khatma, start new, or free reading)',
+                                    ),
                                     style: TextStyle(
                                       color: theme.secondaryTextColor,
                                       fontSize: 12,
@@ -619,8 +707,9 @@ class SettingsSheet extends StatelessWidget {
                                 ),
                                 Divider(
                                   height: 1,
-                                  color: theme.pageInnerBorder
-                                      .withValues(alpha: 0.6),
+                                  color: theme.pageInnerBorder.withValues(
+                                    alpha: 0.6,
+                                  ),
                                 ),
                                 SwitchListTile.adaptive(
                                   contentPadding: EdgeInsets.zero,
@@ -629,7 +718,10 @@ class SettingsSheet extends StatelessWidget {
                                   onChanged:
                                       controller.setShowLastPageKhatmaButton,
                                   title: Text(
-                                    tr('زر إتمام الختمة في آخر صفحة', 'Complete Khatma button on last page'),
+                                    tr(
+                                      'زر إتمام الختمة في آخر صفحة',
+                                      'Complete Khatma button on last page',
+                                    ),
                                     style: TextStyle(
                                       color: theme.glyphColor,
                                       fontSize: 14.5,
@@ -637,7 +729,10 @@ class SettingsSheet extends StatelessWidget {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    tr('إظهار زر خاص أسفل سورة الناس (بعد الآية ٦ في صفحة ٦٠٤) لإتمام الختمة وعرض التقرير', 'Show a button below Surah An-Nas (page 604) to complete your Khatma and view the report'),
+                                    tr(
+                                      'إظهار زر خاص أسفل سورة الناس (بعد الآية ٦ في صفحة ٦٠٤) لإتمام الختمة وعرض التقرير',
+                                      'Show a button below Surah An-Nas (page 604) to complete your Khatma and view the report',
+                                    ),
                                     style: TextStyle(
                                       color: theme.secondaryTextColor,
                                       fontSize: 12,
@@ -659,8 +754,10 @@ class SettingsSheet extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                tr('لون تمييز الآيات المحفوظة',
-                                    'Saved Ayah Highlight Color'),
+                                tr(
+                                  'لون تمييز الآيات المحفوظة',
+                                  'Saved Ayah Highlight Color',
+                                ),
                                 style: TextStyle(
                                   color: theme.glyphColor,
                                   fontSize: 15.5,
@@ -685,7 +782,8 @@ class SettingsSheet extends StatelessWidget {
                                   runSpacing: 10,
                                   children: List.generate(
                                     MushafController
-                                        .savedHighlightPalette.length,
+                                        .savedHighlightPalette
+                                        .length,
                                     (idx) {
                                       final item = MushafController
                                           .savedHighlightPalette[idx];
@@ -699,7 +797,8 @@ class SettingsSheet extends StatelessWidget {
                                           children: [
                                             AnimatedContainer(
                                               duration: const Duration(
-                                                  milliseconds: 160),
+                                                milliseconds: 160,
+                                              ),
                                               width: 36,
                                               height: 36,
                                               decoration: BoxDecoration(
@@ -708,8 +807,9 @@ class SettingsSheet extends StatelessWidget {
                                                 border: Border.all(
                                                   color: isSel
                                                       ? theme.glyphColor
-                                                      : Colors.white
-                                                          .withValues(alpha: 0.7),
+                                                      : Colors.white.withValues(
+                                                          alpha: 0.7,
+                                                        ),
                                                   width: isSel ? 2.6 : 1.4,
                                                 ),
                                               ),
@@ -786,7 +886,10 @@ class SettingsSheet extends StatelessWidget {
                               value: controller.keepScreenAwake,
                               onChanged: controller.setKeepScreenAwake,
                               title: Text(
-                                tr('إبقاء الشاشة مضاءة أثناء القراءة', 'Keep screen awake while reading'),
+                                tr(
+                                  'إبقاء الشاشة مضاءة أثناء القراءة',
+                                  'Keep screen awake while reading',
+                                ),
                                 style: TextStyle(
                                   color: theme.glyphColor,
                                   fontSize: 14.5,
@@ -794,12 +897,102 @@ class SettingsSheet extends StatelessWidget {
                                 ),
                               ),
                               subtitle: Text(
-                                tr('منع قفل الشاشة التلقائي أثناء تصفح المصحف', 'Prevent auto-lock while reading the Mushaf'),
+                                tr(
+                                  'منع قفل الشاشة التلقائي أثناء تصفح المصحف',
+                                  'Prevent auto-lock while reading the Mushaf',
+                                ),
                                 style: TextStyle(
                                   color: theme.secondaryTextColor,
                                   fontSize: 12,
                                 ),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Section 5: Page navigation & orientation
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.ornamentFill,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.pageInnerBorder),
+                            ),
+                            child: Column(
+                              children: [
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: theme.ornamentPrimary,
+                                  secondary: Icon(
+                                    Icons.swap_vert_rounded,
+                                    color: theme.ornamentPrimary,
+                                  ),
+                                  value: controller.verticalScroll,
+                                  onChanged: controller.setVerticalScroll,
+                                  title: Text(
+                                    tr(
+                                      'التمرير العمودي للصفحات',
+                                      'Vertical page scrolling',
+                                      'صفحات کی عمودی اسکرولنگ',
+                                    ),
+                                    style: TextStyle(
+                                      color: theme.glyphColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    tr(
+                                      'تمرير سلس للأعلى والأسفل بدلاً من قلب الصفحات جانبياً',
+                                      'Smooth up/down scrolling instead of flipping pages sideways',
+                                      'صفحات پلٹنے کے بجائے اوپر نیچے ہموار اسکرولنگ',
+                                    ),
+                                    style: TextStyle(
+                                      color: theme.secondaryTextColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                Divider(
+                                  height: 1,
+                                  color: theme.pageInnerBorder,
+                                ),
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: theme.ornamentPrimary,
+                                  secondary: Icon(
+                                    Icons.screen_rotation_rounded,
+                                    color: theme.ornamentPrimary,
+                                  ),
+                                  value: controller.allowLandscape,
+                                  onChanged: controller.setAllowLandscape,
+                                  title: Text(
+                                    tr(
+                                      'العرض الأفقي عند تدوير الهاتف',
+                                      'Landscape view when rotated',
+                                      'فون گھمانے پر افقی منظر',
+                                    ),
+                                    style: TextStyle(
+                                      color: theme.glyphColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    tr(
+                                      'عرض الصفحة بكامل عرض الشاشة عند إمالة الهاتف',
+                                      'Show the page across the full screen width when the phone is turned sideways',
+                                      'فون کو ترچھا کرنے پر صفحہ پوری چوڑائی میں دکھائیں',
+                                    ),
+                                    style: TextStyle(
+                                      color: theme.secondaryTextColor,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

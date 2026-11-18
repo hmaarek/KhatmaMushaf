@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -51,29 +52,34 @@ enum MushafFontScaleMode {
 
   /// Localized (Arabic/English) title for the active app language.
   String get title => tr(arabicTitle, switch (this) {
-        MushafFontScaleMode.standard => 'Standard (full page)',
-        MushafFontScaleMode.large => 'Large',
-        MushafFontScaleMode.extraLarge => 'Extra large',
-        MushafFontScaleMode.pinchToZoom => 'Free pinch-to-zoom',
-      });
+    MushafFontScaleMode.standard => 'Standard (full page)',
+    MushafFontScaleMode.large => 'Large',
+    MushafFontScaleMode.extraLarge => 'Extra large',
+    MushafFontScaleMode.pinchToZoom => 'Free pinch-to-zoom',
+  });
 
   /// Localized (Arabic/English) subtitle for the active app language.
   String get subtitle => tr(arabicSubtitle, switch (this) {
-        MushafFontScaleMode.standard =>
-          'Shows all 15 lines on screen without scrolling',
-        MushafFontScaleMode.large =>
-          'Larger Mushaf font with smooth vertical scrolling',
-        MushafFontScaleMode.extraLarge =>
-          'Very large, clear font while keeping all 15 lines',
-        MushafFontScaleMode.pinchToZoom =>
-          'Use two fingers to zoom the page freely',
-      });
+    MushafFontScaleMode.standard =>
+      'Shows all 15 lines on screen without scrolling',
+    MushafFontScaleMode.large =>
+      'Larger Mushaf font with smooth vertical scrolling',
+    MushafFontScaleMode.extraLarge =>
+      'Very large, clear font while keeping all 15 lines',
+    MushafFontScaleMode.pinchToZoom =>
+      'Use two fingers to zoom the page freely',
+  });
 
   String get badge => tr(badgeText, switch (this) {
-        MushafFontScaleMode.pinchToZoom => 'Free pinch',
-        _ => badgeText.replaceAll('٪', '%').replaceAllMapped(
-            RegExp(r'[٠-٩]'), (m) => '${m[0]!.codeUnitAt(0) - 0x0660}'),
-      });
+    MushafFontScaleMode.pinchToZoom => 'Free pinch',
+    _ =>
+      badgeText
+          .replaceAll('٪', '%')
+          .replaceAllMapped(
+            RegExp(r'[٠-٩]'),
+            (m) => '${m[0]!.codeUnitAt(0) - 0x0660}',
+          ),
+  });
 
   final double scaleFactor;
   final String arabicTitle;
@@ -104,16 +110,18 @@ class MushafController extends ChangeNotifier {
   static const String _prefAutoPlayAyahAfterWord =
       'mushaf_auto_play_ayah_after_word';
   static const String _prefReciterIndex = 'mushaf_reciter_index';
-  static const String _prefAskKhatmaOnStartup =
-      'mushaf_ask_khatma_on_startup';
+  static const String _prefAskKhatmaOnStartup = 'mushaf_ask_khatma_on_startup';
   static const String _prefLanguage = 'mushaf_language'; // 'ar' | 'en' | 'ur'
-  static const String _prefMushafScript = 'mushaf_script'; // 'uthmani' | 'indopak'
+  static const String _prefMushafScript =
+      'mushaf_script'; // 'uthmani' | 'indopak'
   static const String _prefSavedHighlightIndex =
       'mushaf_saved_ayah_highlight_index';
+  static const String _prefVerticalScroll = 'mushaf_vertical_scroll';
+  static const String _prefAllowLandscape = 'mushaf_allow_landscape';
 
   /// Selectable highlight colors for saved (bookmarked) ayahs.
   static const List<({Color color, String ar, String en})>
-      savedHighlightPalette = [
+  savedHighlightPalette = [
     (color: Color(0xFFD9A441), ar: 'ذهبي', en: 'Gold'),
     (color: Color(0xFF2B8A62), ar: 'أخضر', en: 'Green'),
     (color: Color(0xFF3A7BD5), ar: 'أزرق', en: 'Blue'),
@@ -148,6 +156,12 @@ class MushafController extends ChangeNotifier {
   QuranReciter _selectedReciter = QuranReciter.husaryMurattal;
   bool _isHudVisible = false;
   String? _selectedVerseKey;
+  bool _verticalScroll = false;
+  bool _allowLandscape = true;
+
+  /// Registered by the reader screen while the continuous vertical-scroll
+  /// list is active, so [goToPage] can scroll it to a target page.
+  void Function(int page)? verticalJumpHandler;
 
   List<SurahInfo> _surahs = const <SurahInfo>[];
   List<JuzInfo> _juzs = const <JuzInfo>[];
@@ -168,6 +182,12 @@ class MushafController extends ChangeNotifier {
   bool get hasShownSingleTapIntroDialog => _hasShownSingleTapIntroDialog;
   bool get autoPlayAyahAfterWord => _autoPlayAyahAfterWord;
   bool get askKhatmaOnStartup => _askKhatmaOnStartup;
+
+  /// Continuous smooth vertical scrolling instead of side page-flipping.
+  bool get verticalScroll => _verticalScroll;
+
+  /// Rotate to a landscape (horizontal) layout when the phone is turned.
+  bool get allowLandscape => _allowLandscape;
 
   /// False on the very first run, until the user picks a language.
   bool get languageChosen => _languageChosen;
@@ -243,10 +263,14 @@ class MushafController extends ChangeNotifier {
 
     _prefs = await SharedPreferences.getInstance();
     final savedPage = (_prefs?.getInt(_prefLastReadPage) ?? 1).clamp(1, 604);
-    final savedThemeIdx = (_prefs?.getInt(_prefThemeIndex) ?? 0)
-        .clamp(0, MushafThemeType.values.length - 1);
-    final savedScaleIdx = (_prefs?.getInt(_prefFontScaleModeIndex) ?? 0)
-        .clamp(0, MushafFontScaleMode.values.length - 1);
+    final savedThemeIdx = (_prefs?.getInt(_prefThemeIndex) ?? 0).clamp(
+      0,
+      MushafThemeType.values.length - 1,
+    );
+    final savedScaleIdx = (_prefs?.getInt(_prefFontScaleModeIndex) ?? 0).clamp(
+      0,
+      MushafFontScaleMode.values.length - 1,
+    );
     final savedWake = _prefs?.getBool(_prefKeepScreenAwake) ?? true;
     final savedShowKhatmaBtn =
         _prefs?.getBool(_prefShowLastPageKhatmaButton) ?? true;
@@ -258,8 +282,10 @@ class MushafController extends ChangeNotifier {
         _prefs?.getBool(_prefAutoPlayAyahAfterWord) ?? false;
     final savedAskKhatmaStartup =
         _prefs?.getBool(_prefAskKhatmaOnStartup) ?? true;
-    final savedReciterIdx = (_prefs?.getInt(_prefReciterIndex) ?? 0)
-        .clamp(0, QuranReciter.values.length - 1);
+    final savedReciterIdx = (_prefs?.getInt(_prefReciterIndex) ?? 0).clamp(
+      0,
+      QuranReciter.values.length - 1,
+    );
 
     _currentPage = savedPage;
     _themeType = MushafThemeType.values[savedThemeIdx];
@@ -288,9 +314,12 @@ class MushafController extends ChangeNotifier {
     _savedHighlightIndex = (_prefs?.getInt(_prefSavedHighlightIndex) ?? 0)
         .clamp(0, savedHighlightPalette.length - 1);
     _selectedReciter = QuranReciter.values[savedReciterIdx];
+    _verticalScroll = _prefs?.getBool(_prefVerticalScroll) ?? false;
+    _allowLandscape = _prefs?.getBool(_prefAllowLandscape) ?? true;
     _pageController = PageController(initialPage: _currentPage - 1);
 
     await _applyWakelock(_keepScreenAwake);
+    await _applyOrientations(_allowLandscape);
 
     // Load index tables, bookmarks, khatmas, and initial page data + QPC font in parallel
     final results = await Future.wait<Object?>([
@@ -328,13 +357,52 @@ class MushafController extends ChangeNotifier {
     }
   }
 
+  Future<void> _applyOrientations(bool allowLandscape) async {
+    try {
+      await SystemChrome.setPreferredOrientations(
+        allowLandscape
+            ? const [
+                DeviceOrientation.portraitUp,
+                DeviceOrientation.landscapeLeft,
+                DeviceOrientation.landscapeRight,
+              ]
+            : const [
+                DeviceOrientation.portraitUp,
+                DeviceOrientation.portraitDown,
+              ],
+      );
+    } catch (_) {
+      // Ignore in headless/test environments
+    }
+  }
+
+  void setVerticalScroll(bool value) {
+    if (_verticalScroll == value) return;
+    _verticalScroll = value;
+    _prefs?.setBool(_prefVerticalScroll, value);
+    if (!value) {
+      // The PageView will be rebuilt: recreate its controller so it opens
+      // at the page the user reached while scrolling vertically.
+      final old = _pageController;
+      _pageController = PageController(initialPage: _currentPage - 1);
+      WidgetsBinding.instance.addPostFrameCallback((_) => old?.dispose());
+    }
+    notifyListeners();
+  }
+
+  void setAllowLandscape(bool value) {
+    if (_allowLandscape == value) return;
+    _allowLandscape = value;
+    _prefs?.setBool(_prefAllowLandscape, value);
+    unawaited(_applyOrientations(value));
+    notifyListeners();
+  }
+
   void _updateBookmarksCache(List<BookmarkItem> items) {
     _bookmarks = items;
     _bookmarkedPages
       ..clear()
-      ..addAll(
-        items.where((b) => b.isPageBookmark).map((b) => b.pageNumber),
-      );
+      ..addAll(items.where((b) => b.isPageBookmark).map((b) => b.pageNumber));
     _bookmarkedVerseKeys
       ..clear()
       ..addAll(
@@ -400,7 +468,9 @@ class MushafController extends ChangeNotifier {
     }
     _prefs?.setInt(_prefLastReadPage, _currentPage);
 
-    if (_pageController != null && _pageController!.hasClients) {
+    if (_verticalScroll) {
+      verticalJumpHandler?.call(clamped);
+    } else if (_pageController != null && _pageController!.hasClients) {
       _pageController!.jumpToPage(clamped - 1);
     }
     notifyListeners();

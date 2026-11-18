@@ -9,9 +9,10 @@ import 'state/mushaf_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Start in portrait; the controller enables landscape after loading
+  // the user's "rotate to landscape" preference.
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
   ]);
 
   final controller = MushafController();

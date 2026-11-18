@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../l10n/l10n.dart';
 import '../models/mushaf_models.dart';
 
 /// Famous Quran reciters for Full Ayah playback.
@@ -51,6 +52,32 @@ enum QuranReciter {
   final String shortArabicName;
   final String everyAyahFolder;
   final String quranFoundationPath;
+
+  String get displayName => tr(
+        arabicName,
+        switch (this) {
+          QuranReciter.husaryMurattal =>
+            'Sheikh Mahmoud Khalil Al-Husary (Murattal)',
+          QuranReciter.husaryMuallim =>
+            'Sheikh Mahmoud Khalil Al-Husary (Muallim)',
+          QuranReciter.minshawiMurattal =>
+            'Sheikh Muhammad Siddiq Al-Minshawi (Murattal)',
+          QuranReciter.alafasy => 'Sheikh Mishary Rashid Al-Afasy',
+          QuranReciter.abdulBasitMurattal =>
+            'Sheikh Abdul Basit Abdul Samad (Murattal)',
+        },
+      );
+
+  String get shortDisplayName => tr(
+        shortArabicName,
+        switch (this) {
+          QuranReciter.husaryMurattal => 'Al-Husary (Murattal)',
+          QuranReciter.husaryMuallim => 'Al-Husary (Muallim)',
+          QuranReciter.minshawiMurattal => 'Al-Minshawi (Murattal)',
+          QuranReciter.alafasy => 'Al-Afasy',
+          QuranReciter.abdulBasitMurattal => 'Abdul Basit (Murattal)',
+        },
+      );
 
   const QuranReciter({
     required this.id,
@@ -180,7 +207,7 @@ class QuranAudioService extends ChangeNotifier {
     _pendingAyahFallbackText = ayahFallbackText;
     _usedOfflineTtsFallback = false;
     _state = QuranAudioState.loadingWord;
-    _statusMessage = 'جاري تحميل نطق الكلمة...';
+    _statusMessage = tr('جاري تحميل نطق الكلمة...', 'Loading word pronunciation...');
     notifyListeners();
 
     final s3 = word.surahId.toString().padLeft(3, '0');
@@ -206,8 +233,9 @@ class QuranAudioService extends ChangeNotifier {
       if (downloaded) {
         _state = QuranAudioState.playingWord;
         _statusMessage = autoPlayAyahAfter
-            ? 'جاري نطق الكلمة (يتبعها تلاوة الآية)...'
-            : 'جاري نطق الكلمة...';
+            ? tr('جاري نطق الكلمة (يتبعها تلاوة الآية)...',
+                'Pronouncing word (followed by ayah)...')
+            : tr('جاري نطق الكلمة...', 'Pronouncing word...');
         notifyListeners();
 
         await _channel.invokeMethod('playFile', {
@@ -218,7 +246,10 @@ class QuranAudioService extends ChangeNotifier {
         // Offline TTS fallback for the vocalized word
         _usedOfflineTtsFallback = true;
         _state = QuranAudioState.playingWord;
-        _statusMessage = 'نطق صوتي محلي (بدون اتصال بالإنترنت)';
+        _statusMessage = tr(
+          'نطق صوتي محلي (بدون اتصال بالإنترنت)',
+          'Offline speech (no internet)',
+        );
         notifyListeners();
 
         await _channel.invokeMethod('speakArabic', {
@@ -230,7 +261,10 @@ class QuranAudioService extends ChangeNotifier {
     } catch (_) {
       if (myPlaybackId != _playbackCounter) return;
       _state = QuranAudioState.error;
-      _statusMessage = 'تعذر تشغيل الصوت، يرجى التحقق من الاتصال بالإنترنت';
+      _statusMessage = tr(
+        'تعذر تشغيل الصوت، يرجى التحقق من الاتصال بالإنترنت',
+        'Unable to play audio. Please check your internet connection.',
+      );
       notifyListeners();
     }
   }
@@ -253,7 +287,10 @@ class QuranAudioService extends ChangeNotifier {
     _pendingAutoPlayAyah = false;
     _usedOfflineTtsFallback = false;
     _state = QuranAudioState.loadingAyah;
-    _statusMessage = 'جاري تحميل تلاوة الآية (${reciter.shortArabicName})...';
+    _statusMessage = tr(
+      'جاري تحميل تلاوة الآية (${reciter.shortArabicName})...',
+      'Loading ayah recitation (${reciter.shortDisplayName})...',
+    );
     notifyListeners();
 
     final s3 = surahId.toString().padLeft(3, '0');
@@ -277,7 +314,10 @@ class QuranAudioService extends ChangeNotifier {
 
       if (downloaded) {
         _state = QuranAudioState.playingAyah;
-        _statusMessage = 'تلاوة الآية • ${reciter.shortArabicName}';
+        _statusMessage = tr(
+          'تلاوة الآية • ${reciter.shortArabicName}',
+          'Reciting ayah • ${reciter.shortDisplayName}',
+        );
         notifyListeners();
 
         await _channel.invokeMethod('playFile', {
@@ -288,7 +328,10 @@ class QuranAudioService extends ChangeNotifier {
           fallbackTextUthmani.trim().isNotEmpty) {
         _usedOfflineTtsFallback = true;
         _state = QuranAudioState.playingAyah;
-        _statusMessage = 'قراءة محلية للآية (بدون إنترنت)';
+        _statusMessage = tr(
+          'قراءة محلية للآية (بدون إنترنت)',
+          'Offline ayah speech (no internet)',
+        );
         notifyListeners();
 
         await _channel.invokeMethod('speakArabic', {
@@ -298,13 +341,19 @@ class QuranAudioService extends ChangeNotifier {
         });
       } else {
         _state = QuranAudioState.error;
-        _statusMessage = 'يتطلب تشغيل تلاوة الآية الاتصال بالإنترنت للمرة الأولى';
+        _statusMessage = tr(
+          'يتطلب تشغيل تلاوة الآية الاتصال بالإنترنت للمرة الأولى',
+          'Internet connection required for first-time ayah recitation',
+        );
         notifyListeners();
       }
     } catch (_) {
       if (myPlaybackId != _playbackCounter) return;
       _state = QuranAudioState.error;
-      _statusMessage = 'تعذر تشغيل تلاوة الآية';
+      _statusMessage = tr(
+        'تعذر تشغيل تلاوة الآية',
+        'Unable to play ayah recitation',
+      );
       notifyListeners();
     }
   }

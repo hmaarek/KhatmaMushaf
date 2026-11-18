@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../l10n/l10n.dart';
 import '../models/khatma_models.dart';
 import '../models/mushaf_models.dart';
 import '../services/database_service.dart';
@@ -11,6 +12,10 @@ import '../services/khatma_service.dart';
 import '../services/quran_audio_service.dart';
 import '../services/smart_search_service.dart';
 import '../theme/mushaf_theme.dart';
+import '../utils/arabic_utils.dart';
+
+/// Quran script style: Madinah Uthmani (15-line QPC) or Indo-Pak Nastaleeq.
+enum MushafScript { uthmani, indoPak }
 
 /// Controls how the 15-line Uthmani Mushaf page is sized/zoomed.
 /// All modes strictly preserve the 15-line Madinah Mushaf page & line breaks.
@@ -44,6 +49,32 @@ enum MushafFontScaleMode {
     icon: Icons.pinch_rounded,
   );
 
+  /// Localized (Arabic/English) title for the active app language.
+  String get title => tr(arabicTitle, switch (this) {
+        MushafFontScaleMode.standard => 'Standard (full page)',
+        MushafFontScaleMode.large => 'Large',
+        MushafFontScaleMode.extraLarge => 'Extra large',
+        MushafFontScaleMode.pinchToZoom => 'Free pinch-to-zoom',
+      });
+
+  /// Localized (Arabic/English) subtitle for the active app language.
+  String get subtitle => tr(arabicSubtitle, switch (this) {
+        MushafFontScaleMode.standard =>
+          'Shows all 15 lines on screen without scrolling',
+        MushafFontScaleMode.large =>
+          'Larger Mushaf font with smooth vertical scrolling',
+        MushafFontScaleMode.extraLarge =>
+          'Very large, clear font while keeping all 15 lines',
+        MushafFontScaleMode.pinchToZoom =>
+          'Use two fingers to zoom the page freely',
+      });
+
+  String get badge => tr(badgeText, switch (this) {
+        MushafFontScaleMode.pinchToZoom => 'Free pinch',
+        _ => badgeText.replaceAll('٪', '%').replaceAllMapped(
+            RegExp(r'[٠-٩]'), (m) => '${m[0]!.codeUnitAt(0) - 0x0660}'),
+      });
+
   final double scaleFactor;
   final String arabicTitle;
   final String arabicSubtitle;
@@ -75,6 +106,22 @@ class MushafController extends ChangeNotifier {
   static const String _prefReciterIndex = 'mushaf_reciter_index';
   static const String _prefAskKhatmaOnStartup =
       'mushaf_ask_khatma_on_startup';
+  static const String _prefLanguage = 'mushaf_language'; // 'ar' | 'en' | 'ur'
+  static const String _prefMushafScript = 'mushaf_script'; // 'uthmani' | 'indopak'
+  static const String _prefSavedHighlightIndex =
+      'mushaf_saved_ayah_highlight_index';
+
+  /// Selectable highlight colors for saved (bookmarked) ayahs.
+  static const List<({Color color, String ar, String en})>
+      savedHighlightPalette = [
+    (color: Color(0xFFD9A441), ar: 'ذهبي', en: 'Gold'),
+    (color: Color(0xFF2B8A62), ar: 'أخضر', en: 'Green'),
+    (color: Color(0xFF3A7BD5), ar: 'أزرق', en: 'Blue'),
+    (color: Color(0xFFE07A9B), ar: 'وردي', en: 'Pink'),
+    (color: Color(0xFF8E5BD0), ar: 'بنفسجي', en: 'Purple'),
+    (color: Color(0xFFE67E3C), ar: 'برتقالي', en: 'Orange'),
+    (color: Color(0xFF22A6B3), ar: 'فيروزي', en: 'Teal'),
+  ];
 
   final DatabaseService _dbService = DatabaseService.instance;
   final QpcFontLoaderService _fontLoader = QpcFontLoaderService.instance;
@@ -94,6 +141,9 @@ class MushafController extends ChangeNotifier {
   bool _hasShownSingleTapIntroDialog = false;
   bool _autoPlayAyahAfterWord = false;
   bool _askKhatmaOnStartup = true;
+  bool _languageChosen = false;
+  int _savedHighlightIndex = 0;
+  MushafScript _mushafScript = MushafScript.uthmani;
   bool _hasShownStartupSessionPrompt = false;
   QuranReciter _selectedReciter = QuranReciter.husaryMurattal;
   bool _isHudVisible = false;
@@ -118,6 +168,20 @@ class MushafController extends ChangeNotifier {
   bool get hasShownSingleTapIntroDialog => _hasShownSingleTapIntroDialog;
   bool get autoPlayAyahAfterWord => _autoPlayAyahAfterWord;
   bool get askKhatmaOnStartup => _askKhatmaOnStartup;
+
+  /// False on the very first run, until the user picks a language.
+  bool get languageChosen => _languageChosen;
+  AppLanguage get language => L10n.language;
+  bool get isEnglish => L10n.isEn;
+  bool get isUrdu => L10n.isUr;
+  MushafScript get mushafScript => _mushafScript;
+  bool get isIndoPakScript => _mushafScript == MushafScript.indoPak;
+
+  int get savedHighlightIndex => _savedHighlightIndex;
+
+  /// Color used to highlight saved (bookmarked) ayahs on the page.
+  Color get savedAyahHighlightColor =>
+      savedHighlightPalette[_savedHighlightIndex].color;
   bool get hasShownStartupSessionPrompt => _hasShownStartupSessionPrompt;
   QuranReciter get selectedReciter => _selectedReciter;
   bool get isHudVisible => _isHudVisible;
@@ -206,6 +270,23 @@ class MushafController extends ChangeNotifier {
     _hasShownSingleTapIntroDialog = savedShownSingleTapIntro;
     _autoPlayAyahAfterWord = savedAutoPlayAyah;
     _askKhatmaOnStartup = savedAskKhatmaStartup;
+    final savedLang = _prefs?.getString(_prefLanguage);
+    _languageChosen = savedLang != null;
+    _applyLanguage(switch (savedLang) {
+      'en' => AppLanguage.english,
+      'ur' => AppLanguage.urdu,
+      _ => AppLanguage.arabic,
+    });
+    final savedScript = _prefs?.getString(_prefMushafScript);
+    if (savedScript != null) {
+      _mushafScript = savedScript == 'indopak'
+          ? MushafScript.indoPak
+          : MushafScript.uthmani;
+    } else if (savedLang == 'ur') {
+      _mushafScript = MushafScript.indoPak;
+    }
+    _savedHighlightIndex = (_prefs?.getInt(_prefSavedHighlightIndex) ?? 0)
+        .clamp(0, savedHighlightPalette.length - 1);
     _selectedReciter = QuranReciter.values[savedReciterIdx];
     _pageController = PageController(initialPage: _currentPage - 1);
 
@@ -402,6 +483,47 @@ class MushafController extends ChangeNotifier {
     if (_autoPlayAyahAfterWord == value) return;
     _autoPlayAyahAfterWord = value;
     _prefs?.setBool(_prefAutoPlayAyahAfterWord, value);
+    notifyListeners();
+  }
+
+  void _applyLanguage(AppLanguage lang) {
+    L10n.language = lang;
+    ArabicUtils.useWesternDigits = lang == AppLanguage.english;
+  }
+
+  /// Changes the app language, persists it, and rebuilds the whole UI.
+  /// Automatically enables Indo-Pak script when Urdu is selected.
+  void setLanguage(AppLanguage lang) {
+    _languageChosen = true;
+    _applyLanguage(lang);
+    final code = switch (lang) {
+      AppLanguage.arabic => 'ar',
+      AppLanguage.english => 'en',
+      AppLanguage.urdu => 'ur',
+    };
+    _prefs?.setString(_prefLanguage, code);
+    if (lang == AppLanguage.urdu && _mushafScript != MushafScript.indoPak) {
+      _mushafScript = MushafScript.indoPak;
+      _prefs?.setString(_prefMushafScript, 'indopak');
+    }
+    notifyListeners();
+  }
+
+  void setMushafScript(MushafScript script) {
+    if (_mushafScript == script) return;
+    _mushafScript = script;
+    _prefs?.setString(
+      _prefMushafScript,
+      script == MushafScript.indoPak ? 'indopak' : 'uthmani',
+    );
+    notifyListeners();
+  }
+
+  void setSavedHighlightIndex(int index) {
+    final i = index.clamp(0, savedHighlightPalette.length - 1);
+    if (_savedHighlightIndex == i) return;
+    _savedHighlightIndex = i;
+    _prefs?.setInt(_prefSavedHighlightIndex, i);
     notifyListeners();
   }
 

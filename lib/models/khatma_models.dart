@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../l10n/l10n.dart';
+import '../utils/arabic_utils.dart';
+
 enum KhatmaStatus {
   active,
   completed;
@@ -42,6 +45,19 @@ enum ReadingTimeSlot {
   final String arabicName;
   final String englishName;
   final String rangeLabel;
+
+  String get name => tr(arabicName, englishName);
+
+  /// Time range label with digits/AM-PM localized.
+  String get range => L10n.isAr
+      ? rangeLabel
+      : switch (this) {
+          ReadingTimeSlot.fajrMorning => '4:00 AM – 9:00 AM',
+          ReadingTimeSlot.forenoonNoon => '9:00 AM – 2:00 PM',
+          ReadingTimeSlot.asrAfternoon => '2:00 PM – 6:00 PM',
+          ReadingTimeSlot.maghribIsha => '6:00 PM – 10:00 PM',
+          ReadingTimeSlot.nightQiyam => '10:00 PM – 4:00 AM',
+        };
 
   const ReadingTimeSlot({
     required this.arabicName,
@@ -127,6 +143,17 @@ class KhatmaRecord {
     this.metadata = const <String, dynamic>{},
     this.logs = const <KhatmaProgressEntry>[],
   });
+
+  /// Localized display title: auto-generated titles ("الختمة رقم N") are shown
+  /// as "Khatma #N" in English; custom titles are shown as typed.
+  String get displayTitle {
+    final isDefault = title.startsWith('الختمة رقم');
+    if (!isDefault) return title;
+    return tr(
+      'الختمة رقم ${ArabicUtils.toArabicDigits(serialNumber)}',
+      'Khatma #$serialNumber',
+    );
+  }
 
   bool get isActive => status == KhatmaStatus.active;
   bool get isCompleted => status == KhatmaStatus.completed;

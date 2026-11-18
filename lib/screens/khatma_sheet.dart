@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/l10n.dart';
 import '../models/khatma_models.dart';
 import '../models/mushaf_models.dart';
 import '../state/mushaf_controller.dart';
@@ -100,7 +101,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
         final completedList = widget.controller.completedKhatmas;
 
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: L10n.dir,
           child: Container(
             height: MediaQuery.of(context).size.height * 0.88,
             decoration: BoxDecoration(
@@ -134,7 +135,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'متابعة الختمة القرآنية',
+                            tr('متابعة الختمة القرآنية', 'Khatma Tracker'),
                             style: TextStyle(
                               color: theme.glyphColor,
                               fontSize: 18,
@@ -175,10 +176,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       fontWeight: FontWeight.w700,
                     ),
                     tabs: [
-                      const Tab(text: 'الختمة الحالية'),
+                      Tab(text: tr('الختمة الحالية', 'Current Khatma')),
                       Tab(
                         text:
-                            'الختمات المكتملة (${ArabicUtils.toArabicDigits(completedList.length)})',
+                            tr('الختمات المكتملة (${ArabicUtils.toArabicDigits(completedList.length)})', 'Completed (${completedList.length})'),
                       ),
                     ],
                   ),
@@ -256,7 +257,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
               ),
               const SizedBox(height: 14),
               Text(
-                'ابدأ الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                tr('ابدأ الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}', 'Start Khatma #$nextSerial'),
                 style: TextStyle(
                   color: theme.glyphColor,
                   fontSize: 19,
@@ -299,9 +300,9 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: theme.hudSurface,
                           content: Directionality(
-                            textDirection: TextDirection.rtl,
+                            textDirection: L10n.dir,
                             child: Text(
-                              'بدأت ${created.title} على بركة الله!',
+                              tr('بدأت ${created.displayTitle} على بركة الله!', '${created.displayTitle} started!'),
                               style: TextStyle(color: theme.hudText),
                             ),
                           ),
@@ -310,7 +311,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                   },
                   icon: const Icon(Icons.play_arrow_rounded, size: 22),
                   label: Text(
-                    'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)} الآن',
+                    tr('بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)} الآن', 'Start Khatma #$nextSerial Now'),
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -373,7 +374,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        khatma.title,
+                        khatma.displayTitle,
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 17,
@@ -395,7 +396,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       const SizedBox(width: 4),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'حذف هذه الختمة',
+                        tooltip: tr('حذف هذه الختمة', 'Delete this Khatma'),
                         icon: Icon(
                           Icons.delete_outline_rounded,
                           color: theme.bookmarkRibbon,
@@ -410,7 +411,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
               ),
               const SizedBox(height: 8),
               Text(
-                'تاريخ ووقت البدء: ${_formatDateTimeArabic(khatma.startedAt)}',
+                tr('تاريخ ووقت البدء: ', 'Started: ') + _formatDateTimeArabic(khatma.startedAt),
                 style: TextStyle(
                   color: theme.secondaryTextColor,
                   fontSize: 12.5,
@@ -418,35 +419,29 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                 ),
               ),
               const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: khatma.progressRatio.clamp(0.02, 1.0),
-                  minHeight: 9,
-                  backgroundColor: theme.pageBackground,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(theme.ornamentPrimary),
-                ),
+              _DecoratedGreenProgressBar(
+                progress: khatma.progressRatio.clamp(0.02, 1.0),
+                theme: theme,
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   _MiniStatBox(
-                    label: 'الآيات المقروءة',
+                    label: tr('الآيات المقروءة', 'Ayahs Read'),
                     value:
                         '${ArabicUtils.toArabicDigits(khatma.reachedAyahsCount)} / ٦٢٣٦',
                     theme: theme,
                   ),
                   const SizedBox(width: 8),
                   _MiniStatBox(
-                    label: 'الصفحة الحالية',
+                    label: tr('الصفحة الحالية', 'Current Page'),
                     value:
                         '${ArabicUtils.toArabicDigits(khatma.reachedPageNumber)} / ٦٠٤',
                     theme: theme,
                   ),
                   const SizedBox(width: 8),
                   _MiniStatBox(
-                    label: 'الجزء الحالي',
+                    label: tr('الجزء الحالي', 'Current Juz'),
                     value:
                         '${ArabicUtils.toArabicDigits(khatma.reachedJuzNumber)} / ٣٠',
                     theme: theme,
@@ -478,7 +473,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'الموضع الحالي في الختمة',
+                    tr('الموضع الحالي في الختمة', 'Current Khatma Position'),
                     style: TextStyle(
                       color: theme.glyphColor,
                       fontSize: 15.5,
@@ -574,8 +569,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       icon: const Icon(Icons.menu_book_rounded, size: 18),
                       label: Text(
                         mark == null
-                            ? 'الذهاب لبداية الختمة'
-                            : 'مواصلة القراءة من العلامة',
+                            ? tr('الذهاب لبداية الختمة', 'Go to Start of Khatma')
+                            : tr('مواصلة القراءة من العلامة', 'Continue from Mark'),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -602,8 +597,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                             .deleteCurrentKhatmaMark(khatma.id);
                       },
                       icon: const Icon(Icons.undo_rounded, size: 18),
-                      label: const Text(
-                        'حذف العلامة',
+                      label: Text(
+                        tr('حذف العلامة', 'Remove Mark'),
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
@@ -630,7 +625,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                         color: theme.ornamentPrimary,
                       ),
                       label: Text(
-                        'إحصائيات الختمة حتى الآن',
+                        tr('إحصائيات الختمة حتى الآن', 'Khatma Stats So Far'),
                         style: TextStyle(
                           color: theme.ornamentPrimary,
                           fontSize: 12.5,
@@ -657,8 +652,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                         size: 18,
                         color: Color(0xFF2B8A62),
                       ),
-                      label: const Text(
-                        'إتمام الختمة الآن',
+                      label: Text(
+                        tr('إتمام الختمة الآن', 'Complete Khatma Now'),
                         style: TextStyle(
                           color: Color(0xFF2B8A62),
                           fontSize: 12.5,
@@ -695,9 +690,9 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: theme.hudSurface,
                         content: Directionality(
-                          textDirection: TextDirection.rtl,
+                          textDirection: L10n.dir,
                           child: Text(
-                            'بدأت ${created.title} على بركة الله!',
+                            tr('بدأت ${created.displayTitle} على بركة الله!', '${created.displayTitle} started!'),
                             style: TextStyle(color: theme.hudText),
                           ),
                         ),
@@ -705,8 +700,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                     );
                 },
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                label: const Text(
-                  'بدء ختمة جديدة / استكمال ختمة من مصحف آخر',
+                label: Text(
+                  tr('بدء ختمة جديدة / استكمال ختمة من مصحف آخر', 'Start New / Import from Another Mushaf'),
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
@@ -720,7 +715,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
         const SizedBox(height: 16),
         // 3. Progress History Log
         Text(
-          'سجل علامات التقدم (${ArabicUtils.toArabicDigits(khatma.logs.length)})',
+          tr('سجل علامات التقدم (${ArabicUtils.toArabicDigits(khatma.logs.length)})', 'Progress Log (${khatma.logs.length})'),
           style: TextStyle(
             color: theme.glyphColor,
             fontSize: 15,
@@ -805,8 +800,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                           color: theme.ornamentPrimary,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
-                          'الحالية',
+                        child: Text(
+                          tr('الحالية', 'Current'),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10.5,
@@ -931,8 +926,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                         khatma: khatma,
                       ),
                       icon: const Icon(Icons.assessment_rounded, size: 18),
-                      label: const Text(
-                        'عرض التقرير الكامل',
+                      label: Text(
+                        tr('عرض التقرير الكامل', 'View Full Report'),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -976,7 +971,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
       context: context,
       builder: (dialogCtx) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: L10n.dir,
           child: AlertDialog(
             backgroundColor: theme.pageBackground,
             shape: RoundedRectangleBorder(
@@ -1004,7 +999,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
               ],
             ),
             content: Text(
-              'هل أنت متأكد من حذف «${khatma.title}» وسجلها بالكامل؟\n\nتنبيه: لا يمكن التراجع عن هذا الإجراء بعد الحذف.',
+              'هل أنت متأكد من حذف «${khatma.displayTitle}» وسجلها بالكامل؟\n\nتنبيه: لا يمكن التراجع عن هذا الإجراء بعد الحذف.',
               style: TextStyle(
                 color: theme.secondaryTextColor,
                 fontSize: 14.5,
@@ -1017,7 +1012,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
               TextButton(
                 onPressed: () => Navigator.of(dialogCtx).pop(false),
                 child: Text(
-                  'إلغاء',
+                  tr('إلغاء', 'Cancel'),
                   style: TextStyle(
                     color: theme.secondaryTextColor,
                     fontWeight: FontWeight.w700,
@@ -1069,7 +1064,7 @@ class _KhatmaReportSheet extends StatelessWidget {
     final theme = controller.theme;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: L10n.dir,
       child: Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.90,
@@ -1309,7 +1304,7 @@ class _KhatmaReportSheet extends StatelessWidget {
                                       behavior: SnackBarBehavior.floating,
                                       backgroundColor: theme.hudSurface,
                                       content: Directionality(
-                                        textDirection: TextDirection.rtl,
+                                        textDirection: L10n.dir,
                                         child: Text(
                                           'تم نسخ تقرير الختمة إلى الحافظة',
                                           style:
@@ -1320,8 +1315,8 @@ class _KhatmaReportSheet extends StatelessWidget {
                                   );
                               },
                               icon: const Icon(Icons.copy_rounded, size: 18),
-                              label: const Text(
-                                'نسخ التقرير',
+                              label: Text(
+                                tr('نسخ التقرير', 'Copy Report'),
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),
@@ -1340,8 +1335,8 @@ class _KhatmaReportSheet extends StatelessWidget {
                               ),
                               onPressed: () => Navigator.of(context).pop(),
                               icon: const Icon(Icons.check_rounded, size: 18),
-                              label: const Text(
-                                'إغلاق',
+                              label: Text(
+                                tr('إغلاق', 'Close'),
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),
@@ -1544,7 +1539,7 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
     final mark = activeKhatma?.currentMark;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: L10n.dir,
       child: Dialog(
         backgroundColor: theme.pageBackground,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1589,7 +1584,7 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                'مرحباً بك في مصحف الختمة',
+                tr('مرحباً بك في مصحف الختمة', 'Welcome to Khatma Mushaf'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: theme.glyphColor,
@@ -1599,7 +1594,7 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                'اختر كيف تودّ المتابعة في هذه الجلسة:',
+                tr('اختر كيف تودّ المتابعة في هذه الجلسة:', 'How would you like to continue this session?'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: theme.secondaryTextColor,
@@ -1613,7 +1608,7 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               if (activeKhatma != null) ...[
                 _StartupOptionCard(
                   icon: Icons.flag_rounded,
-                  title: 'مواصلة الختمة الحالية (${activeKhatma.title})',
+                  title: tr('مواصلة الختمة الحالية (${activeKhatma.displayTitle})', 'Continue ${activeKhatma.displayTitle}'),
                   subtitle: mark != null
                       ? 'الموضع الحالي: سورة ${mark.surahNameArabic} • الآية ${ArabicUtils.toArabicDigits(mark.ayahNumber)} (ص ${ArabicUtils.toArabicDigits(mark.pageNumber)})'
                       : 'البداية: سورة الفاتحة • الآية ١ (ص ١)',
@@ -1633,9 +1628,9 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               // Option 2: Start a New Khatma (or import from real Mushaf / another device)
               _StartupOptionCard(
                 icon: Icons.add_task_rounded,
-                title: 'بدء ختمة جديدة',
+                title: tr('بدء ختمة جديدة', 'Start a New Khatma'),
                 subtitle:
-                    'بدء ختمة من أول المصحف، أو استكمال ختمة بدأتها في مصحف ورقي أو جهاز آخر',
+                    tr('بدء ختمة من أول المصحف، أو استكمال ختمة بدأتها في مصحف ورقي أو جهاز آخر', 'Start from Al-Fatihah, or continue a Khatma from a physical Mushaf or another device'),
                 isPrimary: activeKhatma == null,
                 theme: theme,
                 onTap: () async {
@@ -1652,9 +1647,9 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: theme.hudSurface,
                         content: Directionality(
-                          textDirection: TextDirection.rtl,
+                          textDirection: L10n.dir,
                           child: Text(
-                            'بدأت ${created.title} على بركة الله!',
+                            tr('بدأت ${created.displayTitle} على بركة الله!', '${created.displayTitle} started!'),
                             style: TextStyle(color: theme.hudText),
                           ),
                         ),
@@ -1667,9 +1662,9 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               // Option 3: Free Reading
               _StartupOptionCard(
                 icon: Icons.menu_book_rounded,
-                title: 'قراءة حرة',
+                title: tr('قراءة حرة', 'Free Reading'),
                 subtitle:
-                    'تصفح المصحف والقراءة الحرة دون الارتباط بعلامة الختمة (ص ${ArabicUtils.toArabicDigits(controller.currentPage)})',
+                    tr('تصفح المصحف والقراءة الحرة دون الارتباط بعلامة الختمة (ص ${ArabicUtils.toArabicDigits(controller.currentPage)})', 'Browse and read freely without updating Khatma mark (p. ${controller.currentPage})'),
                 isPrimary: false,
                 theme: theme,
                 onTap: () {
@@ -1825,11 +1820,11 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
       firstDate: DateTime(now.year - 5, 1, 1),
       lastDate: now,
       helpText: 'اختر تاريخ بدء الختمة',
-      cancelText: 'إلغاء',
+      cancelText: tr('إلغاء', 'Cancel'),
       confirmText: 'تأكيد التاريخ',
       builder: (context, child) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: L10n.dir,
           child: child ?? const SizedBox.shrink(),
         );
       },
@@ -1909,7 +1904,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
     );
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: L10n.dir,
       child: Dialog(
         backgroundColor: theme.pageBackground,
         insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -1936,7 +1931,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                        tr('بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}', 'Start Khatma #$nextSerial'),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 18,
@@ -1975,7 +1970,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'يمكنك البدء من أول المصحف (سورة الفاتحة آية ١) بتاريخ اليوم، أو استكمال ختمة بدأتها في الماضي على مصحف ورقي أو جهاز آخر عبر اختيار تاريخ سابق وتحديد السورة والآية التي وصلت إليها.',
+                        tr('يمكنك البدء من أول المصحف (سورة الفاتحة آية ١) بتاريخ اليوم، أو استكمال ختمة بدأتها في الماضي على مصحف ورقي أو جهاز آخر عبر اختيار تاريخ سابق وتحديد السورة والآية التي وصلت إليها.', 'You can start from Surah Al-Fatihah (1:1) today, or continue a Khatma you started in the past on a physical Mushaf or another device by picking a past start date and the Surah & Ayah you reached.'),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 12.5,
@@ -2002,7 +1997,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'بداية الختمة (السورة والآية)',
+                        tr('بداية الختمة (السورة والآية)', 'Khatma Starting Verse'),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 14.5,
@@ -2029,7 +2024,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                         _loadAyahPreview();
                       },
                       child: Text(
-                        'إعادة للفاتحة (١:١)',
+                        tr('إعادة للفاتحة (١:١)', 'Reset to 1:1'),
                         style: TextStyle(
                           color: theme.ornamentPrimary,
                           fontSize: 12,
@@ -2059,7 +2054,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'السورة:',
+                                tr('السورة:', 'Surah:'),
                                 style: TextStyle(
                                   color: theme.secondaryTextColor,
                                   fontSize: 12,
@@ -2091,7 +2086,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                                       return DropdownMenuItem<int>(
                                         value: s.id,
                                         child: Text(
-                                          '${ArabicUtils.toArabicDigits(s.id)}. سورة ${s.nameArabic}',
+                                          tr('${ArabicUtils.toArabicDigits(s.id)}. سورة ${s.nameArabic}', '${s.id}. ${s.nameEnglish}'),
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: theme.glyphColor,
@@ -2123,7 +2118,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'الآية:',
+                                tr('الآية:', 'Ayah:'),
                                 style: TextStyle(
                                   color: theme.secondaryTextColor,
                                   fontSize: 12,
@@ -2161,7 +2156,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                                         return DropdownMenuItem<int>(
                                           value: ayahNum,
                                           child: Text(
-                                            'الآية ${ArabicUtils.toArabicDigits(ayahNum)}',
+                                            tr('الآية ${ArabicUtils.toArabicDigits(ayahNum)}', 'Ayah $ayahNum'),
                                             style: TextStyle(
                                               color: theme.glyphColor,
                                               fontSize: 13.5,
@@ -2238,7 +2233,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'تاريخ بدء الختمة',
+                    tr('تاريخ بدء الختمة', 'Khatma Start Date'),
                     style: TextStyle(
                       color: theme.glyphColor,
                       fontSize: 14.5,
@@ -2310,7 +2305,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'تغيير',
+                              tr('تغيير', 'Change'),
                               style: TextStyle(
                                 color: theme.ornamentPrimary,
                                 fontSize: 12,
@@ -2331,7 +2326,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                 runSpacing: 6,
                 children: [
                   ChoiceChip(
-                    label: const Text('اليوم'),
+                    label: Text(tr('اليوم', 'Today')),
                     selected: isToday,
                     selectedColor: theme.ornamentPrimary,
                     backgroundColor: theme.ornamentFill,
@@ -2344,7 +2339,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                     onSelected: (_) => _setRelativeDaysAgo(0),
                   ),
                   ChoiceChip(
-                    label: const Text('أمس'),
+                    label: Text(tr('أمس', 'Yesterday')),
                     selected: isYesterday,
                     selectedColor: theme.ornamentPrimary,
                     backgroundColor: theme.ornamentFill,
@@ -2357,7 +2352,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                     onSelected: (_) => _setRelativeDaysAgo(1),
                   ),
                   ChoiceChip(
-                    label: const Text('قبل أسبوع'),
+                    label: Text(tr('قبل أسبوع', '1 Week Ago')),
                     selected: is7DaysAgo,
                     selectedColor: theme.ornamentPrimary,
                     backgroundColor: theme.ornamentFill,
@@ -2376,7 +2371,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       color: theme.ornamentPrimary,
                     ),
                     label: Text(
-                      'تاريخ آخر...',
+                      tr('تاريخ آخر...', 'Other Date...'),
                       style: TextStyle(
                         color: theme.glyphColor,
                         fontSize: 12,
@@ -2398,7 +2393,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                         ? null
                         : () => Navigator.of(context).pop(),
                     child: Text(
-                      'إلغاء',
+                      tr('إلغاء', 'Cancel'),
                       style: TextStyle(
                         color: theme.secondaryTextColor,
                         fontWeight: FontWeight.w700,
@@ -2419,7 +2414,7 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       onPressed: _isSubmitting ? null : _confirmStartKhatma,
                       icon: const Icon(Icons.play_arrow_rounded, size: 22),
                       label: Text(
-                        'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                        tr('بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}', 'Start Khatma #$nextSerial'),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -2435,4 +2430,121 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
       ),
     );
   }
+}
+
+
+class _DecoratedGreenProgressBar extends StatelessWidget {
+  final double progress;
+  final MushafThemeData theme;
+
+  const _DecoratedGreenProgressBar({
+    required this.progress,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const greenLight = Color(0xFF34A877);
+    const greenMain = Color(0xFF2B8A62);
+    const greenDark = Color(0xFF1F7A53);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: progress.clamp(0.02, 1.0)),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return Container(
+          height: 18,
+          decoration: BoxDecoration(
+            color: theme.pageBackground,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: greenMain.withValues(alpha: 0.45),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final fullW = constraints.maxWidth;
+                final fillW = (fullW * value).clamp(16.0, fullW);
+                return Stack(
+                  children: [
+                    // 25%, 50%, 75% subtle tick marks on the track
+                    for (final frac in const [0.25, 0.50, 0.75])
+                      Positioned(
+                        left: fullW * frac,
+                        top: 3,
+                        bottom: 3,
+                        child: Container(
+                          width: 1,
+                          color: theme.secondaryTextColor.withValues(alpha: 0.25),
+                        ),
+                      ),
+                    // Green gradient fill with diagonal stripe decoration
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Container(
+                        width: fillW,
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9),
+                          gradient: const LinearGradient(
+                            colors: [greenDark, greenMain, greenLight],
+                          ),
+                        ),
+                        child: CustomPaint(
+                          painter: _DiagonalStripePainter(),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DiagonalStripePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.16)
+      ..strokeWidth = 2.0;
+    const step = 10.0;
+    for (double x = -size.height; x < size.width + size.height; x += step) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

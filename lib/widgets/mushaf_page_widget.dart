@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../models/mushaf_models.dart';
+import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
@@ -518,7 +519,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       } else if (isKhatmaMark) {
         baseBgColor = const Color(0x3D2B8A62);
       } else if (isBookmarkedAyah) {
-        baseBgColor = theme.ayahHighlightFill.withValues(alpha: 0.14);
+        baseBgColor =
+            widget.controller.savedAyahHighlightColor.withValues(alpha: 0.28);
       }
 
       final Color wordBgColor = isSelectedWord
@@ -551,7 +553,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             recognizer: markerRecognizer,
             style: TextStyle(
               fontFamily: fontFamily,
-              fontSize: fontSize,
+              fontSize: fontSize * 1.18,
               height: lineHeight,
               wordSpacing: wordSpacing,
               color: isSelectedAyah
@@ -595,7 +597,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             recognizer: wordRecognizer,
             style: TextStyle(
               fontFamily: fontFamily,
-              fontSize: fontSize,
+              fontSize: fontSize * 1.18,
               height: lineHeight,
               wordSpacing: wordSpacing,
               color: wordTextColor,
@@ -611,7 +613,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             recognizer: markerRecognizer,
             style: TextStyle(
               fontFamily: fontFamily,
-              fontSize: fontSize,
+              fontSize: fontSize * 1.18,
               height: lineHeight,
               wordSpacing: wordSpacing,
               color: isSelectedAyah
@@ -641,7 +643,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             recognizer: wordRecognizer,
             style: TextStyle(
               fontFamily: fontFamily,
-              fontSize: fontSize,
+              fontSize: fontSize * 1.18,
               height: lineHeight,
               wordSpacing: wordSpacing,
               color: wordTextColor,
@@ -945,27 +947,100 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
+
+  Widget _buildIndoPakPageBody(
+    MushafPageData pageData,
+    MushafThemeData theme,
+    double fontScale,
+  ) {
+    return FutureBuilder<
+        List<({String verseKey, int surahId, int ayahNumber, String textIndopak})>>(
+      future: DatabaseService.instance.getIndoPakVersesForPage(widget.pageNumber),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: theme.ornamentPrimary,
+            ),
+          );
+        }
+        final verses = snapshot.data!;
+        final selectedVerse = widget.controller.selectedVerseKey;
+        final playingAyahKey = widget.controller.playingAyahVerseKey;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: RichText(
+              textAlign: TextAlign.justify,
+              text: TextSpan(
+                children: [
+                  for (final v in verses) ...[
+                    TextSpan(
+                      text: '${v.textIndopak} ',
+                      style: TextStyle(
+                        fontFamily: 'IndoPak',
+                        fontSize: 23.0 * fontScale,
+                        height: 2.05,
+                        color: (selectedVerse == v.verseKey ||
+                                playingAyahKey == v.verseKey)
+                            ? theme.ornamentPrimary
+                            : widget.controller.isKhatmaCurrentVerse(v.verseKey)
+                                ? const Color(0xFF1F7A53)
+                                : theme.glyphColor,
+                        backgroundColor: (selectedVerse == v.verseKey ||
+                                playingAyahKey == v.verseKey)
+                            ? theme.ayahHighlightFill
+                            : widget.controller.isKhatmaCurrentVerse(v.verseKey)
+                                ? const Color(0x3D2B8A62)
+                                : widget.controller.isAyahBookmarked(v.verseKey)
+                                    ? widget.controller.savedAyahHighlightColor
+                                        .withValues(alpha: 0.28)
+                                    : null,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' ﴿${ArabicUtils.toArabicDigits(v.ayahNumber)}﴾ ',
+                      style: TextStyle(
+                        fontFamily: 'IndoPak',
+                        fontSize: 21.0 * fontScale,
+                        height: 2.05,
+                        color: theme.ornamentPrimary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildFooterPageNumber(int pageNumber, MushafThemeData theme) {
     return SizedBox(
-      height: 20,
+      height: 28,
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 1.0),
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 2.0),
           decoration: BoxDecoration(
             color: theme.ornamentFill,
-            borderRadius: BorderRadius.circular(12.0),
+            borderRadius: BorderRadius.circular(14.0),
             border: Border.all(
               color: theme.pageInnerBorder,
-              width: 1.0,
+              width: 1.2,
             ),
           ),
           child: Text(
             ArabicUtils.toArabicDigits(pageNumber),
             style: TextStyle(
-              fontSize: 12.0,
-              fontWeight: FontWeight.w700,
+              fontSize: 17.0,
+              fontWeight: FontWeight.w800,
               color: theme.secondaryTextColor,
-              height: 1.1,
+              height: 1.15,
             ),
           ),
         ),

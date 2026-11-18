@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
 import '../utils/arabic_utils.dart';
@@ -66,123 +67,136 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
                 child: SafeArea(
                   bottom: false,
                   child: Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: Row(
+                    textDirection: L10n.dir,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Quick Index button (Surahs / Juzs / Page Jump)
-                        _HudIconButton(
-                          icon: Icons.menu_book_rounded,
-                          tooltip: 'الفهرس (Index)',
-                          label: 'الفهرس',
-                          theme: theme,
-                          onTap: widget.onOpenIndex,
-                        ),
-                        const SizedBox(width: 8),
-                        // Surah & Juz Info in center-right
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: widget.onOpenIndex,
-                            behavior: HitTestBehavior.opaque,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  pageData?.info.surahNamesArabic ??
-                                      'المصحف الشريف',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: theme.hudText,
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  pageData != null
-                                      ? 'الجزء ${ArabicUtils.toArabicDigits(pageData.info.juzNumber)} • الحزب ${ArabicUtils.toArabicDigits(pageData.info.hizbNumber)} • ص ${ArabicUtils.toArabicDigits(currentPage)}'
-                                      : 'صفحة ${ArabicUtils.toArabicDigits(currentPage)}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color:
-                                        theme.hudText.withValues(alpha: 0.75),
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                        Row(
+                          children: [
+                            _HudIconButton(
+                              icon: Icons.menu_book_rounded,
+                              tooltip: tr('الفهرس', 'Index'),
+                              theme: theme,
+                              onTap: widget.onOpenIndex,
                             ),
-                          ),
-                        ),
-                        // Offline Arabic Search button
-                        _HudIconButton(
-                          icon: Icons.search_rounded,
-                          tooltip: 'بحث في القرآن (Search)',
-                          theme: theme,
-                          onTap: widget.onOpenSearch,
-                        ),
-                        const SizedBox(width: 5),
-                        // Khatma tracker button
-                        _HudIconButton(
-                          icon: Icons.workspace_premium_rounded,
-                          tooltip: 'متابعة الختمة (Khatma)',
-                          label: 'الختمة',
-                          theme: theme,
-                          onTap: widget.onOpenKhatma,
-                        ),
-                        const SizedBox(width: 5),
-                        // Bookmarks list button
-                        _HudIconButton(
-                          icon: Icons.collections_bookmark_outlined,
-                          fallbackIcon: Icons.bookmarks_outlined,
-                          tooltip: 'العلامات المرجعية (Bookmarks)',
-                          badgeCount: widget.controller.bookmarks.length,
-                          theme: theme,
-                          onTap: widget.onOpenBookmarks,
-                        ),
-                        const SizedBox(width: 5),
-                        // Settings button (Font Size, Pinch-to-Zoom, Themes)
-                        _HudIconButton(
-                          icon: Icons.tune_rounded,
-                          tooltip: 'إعدادات الخط والعرض (Settings)',
-                          theme: theme,
-                          onTap: widget.onOpenSettings,
-                        ),
-                        const SizedBox(width: 5),
-                        // Quick Page Bookmark Ribbon toggle
-                        _QuickBookmarkRibbonButton(
-                          isBookmarked:
-                              widget.controller.isCurrentPageBookmarked,
-                          theme: theme,
-                          onTap: () async {
-                            final added = await widget.controller
-                                .toggleCurrentPageBookmark();
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  duration: const Duration(milliseconds: 1400),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: theme.hudSurface,
-                                  content: Directionality(
-                                    textDirection: TextDirection.rtl,
-                                    child: Text(
-                                      added
-                                          ? 'تم حفظ علامة الصفحة ${ArabicUtils.toArabicDigits(currentPage)}'
-                                          : 'تم إزالة علامة الصفحة ${ArabicUtils.toArabicDigits(currentPage)}',
-                                      style: TextStyle(color: theme.hudText),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: widget.onOpenIndex,
+                                behavior: HitTestBehavior.opaque,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      pageData == null
+                                          ? tr('المصحف الشريف', 'The Holy Quran')
+                                          : (L10n.isEn
+                                              ? pageData.info.surahNamesEnglish
+                                              : pageData.info.surahNamesArabic),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: theme.hudText,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      pageData != null
+                                          ? tr(
+                                              'الجزء ${ArabicUtils.toArabicDigits(pageData.info.juzNumber)} • الحزب ${ArabicUtils.toArabicDigits(pageData.info.hizbNumber)} • ص ${ArabicUtils.toArabicDigits(currentPage)}',
+                                              'Juz ${pageData.info.juzNumber} • Hizb ${pageData.info.hizbNumber} • p. $currentPage',
+                                            )
+                                          : tr(
+                                              'صفحة ${ArabicUtils.toArabicDigits(currentPage)}',
+                                              'Page $currentPage',
+                                            ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: theme.hudText
+                                            .withValues(alpha: 0.75),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                          },
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _QuickBookmarkRibbonButton(
+                              isBookmarked:
+                                  widget.controller.isCurrentPageBookmarked,
+                              theme: theme,
+                              onTap: () async {
+                                final added = await widget.controller
+                                    .toggleCurrentPageBookmark();
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      duration:
+                                          const Duration(milliseconds: 1400),
+                                      behavior: SnackBarBehavior.floating,
+                                      backgroundColor: theme.hudSurface,
+                                      content: Directionality(
+                                        textDirection: L10n.dir,
+                                        child: Text(
+                                          added
+                                              ? tr(
+                                                  'تم حفظ علامة الصفحة ${ArabicUtils.toArabicDigits(currentPage)}',
+                                                  'Bookmarked page $currentPage')
+                                              : tr(
+                                                  'تم إزالة علامة الصفحة ${ArabicUtils.toArabicDigits(currentPage)}',
+                                                  'Removed bookmark on page $currentPage'),
+                                          style: TextStyle(color: theme.hudText),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _HudIconButton(
+                              icon: Icons.search_rounded,
+                              tooltip: tr('بحث في القرآن', 'Search the Quran'),
+                              theme: theme,
+                              onTap: widget.onOpenSearch,
+                            ),
+                            _HudIconButton(
+                              icon: Icons.workspace_premium_rounded,
+                              tooltip: tr('متابعة الختمة', 'Khatma'),
+                              theme: theme,
+                              onTap: widget.onOpenKhatma,
+                            ),
+                            _HudIconButton(
+                              icon: Icons.collections_bookmark_outlined,
+                              fallbackIcon: Icons.bookmarks_outlined,
+                              tooltip: tr('العلامات المرجعية', 'Bookmarks'),
+                              badgeCount: widget.controller.bookmarks.length,
+                              theme: theme,
+                              onTap: widget.onOpenBookmarks,
+                            ),
+                            _HudIconButton(
+                              icon: Icons.tune_rounded,
+                              tooltip: tr('إعدادات الخط والعرض', 'Settings'),
+                              theme: theme,
+                              onTap: widget.onOpenSettings,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -230,12 +244,13 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                         const SizedBox(height: 10),
                         // Scrubber header info + quick Font Size / Zoom pill
                         Directionality(
-                          textDirection: TextDirection.rtl,
+                          textDirection: L10n.dir,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'صفحة ${ArabicUtils.toArabicDigits(activeSliderPage)} من ٦٠٤',
+                                tr('صفحة ${ArabicUtils.toArabicDigits(activeSliderPage)} من ٦٠٤',
+                                    'Page $activeSliderPage of 604'),
                                 style: TextStyle(
                                   color: theme.hudText,
                                   fontSize: 13,
@@ -244,35 +259,48 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                               ),
                               InkWell(
                                 borderRadius: BorderRadius.circular(8),
-                                onTap: widget.onOpenSettings,
+                                onTap: widget.onOpenKhatma,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 9,
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: theme.hudSurface,
+                                    color: widget.controller.activeKhatma != null
+                                        ? const Color(0xFF2B8A62)
+                                        : theme.hudSurface,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: theme.ornamentSecondary
-                                          .withValues(alpha: 0.45),
+                                      color: widget.controller.activeKhatma != null
+                                          ? const Color(0xFF2B8A62)
+                                          : theme.ornamentSecondary
+                                              .withValues(alpha: 0.45),
                                     ),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        widget.controller.fontScaleMode.icon,
-                                        size: 14,
-                                        color: theme.ornamentSecondary,
+                                        Icons.workspace_premium_rounded,
+                                        size: 15,
+                                        color: widget.controller.activeKhatma != null
+                                            ? Colors.white
+                                            : theme.ornamentSecondary,
                                       ),
-                                      const SizedBox(width: 5),
+                                      const SizedBox(width: 4),
                                       Text(
-                                        'الخط: ${widget.controller.fontScaleMode.arabicTitle}',
+                                        widget.controller.activeKhatma != null
+                                            ? tr(
+                                                'الختمة #${ArabicUtils.toArabicDigits(widget.controller.activeKhatma!.serialNumber)}',
+                                                'Khatma #${widget.controller.activeKhatma!.serialNumber}',
+                                              )
+                                            : tr('قراءة حرة', 'Free reading'),
                                         style: TextStyle(
-                                          color: theme.hudText,
+                                          color: widget.controller.activeKhatma != null
+                                              ? Colors.white
+                                              : theme.hudText,
                                           fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ],
@@ -371,11 +399,17 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
     if (surahs.isEmpty) return '';
     for (int i = surahs.length - 1; i >= 0; i--) {
       if (page >= surahs[i].startPage) {
-        return 'سورة ${surahs[i].nameArabic}';
+        return tr('سورة ${surahs[i].nameArabic}', surahs[i].nameEnglish);
       }
     }
-    return 'سورة ${surahs.first.nameArabic}';
+    return tr('سورة ${surahs.first.nameArabic}', surahs.first.nameEnglish);
   }
+
+  String _themeLabel(MushafThemeData t) => switch (t.type) {
+        MushafThemeType.warmPaper => tr(t.arabicLabel, 'Mushaf paper'),
+        MushafThemeType.crispWhite => tr(t.arabicLabel, 'Bright white'),
+        MushafThemeType.amoledDark => tr(t.arabicLabel, 'AMOLED dark'),
+      };
 
   Widget _buildThemeSelectorRow(MushafThemeData activeTheme) {
     return Directionality(
@@ -425,7 +459,7 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          themeOption.arabicLabel,
+                          _themeLabel(themeOption),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -478,8 +512,8 @@ class _HudIconButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: label != null ? 9.0 : 8.0,
-            vertical: 8.0,
+            horizontal: label != null ? 12.0 : 11.0,
+            vertical: 10.0,
           ),
           child: Stack(
             clipBehavior: Clip.none,
@@ -489,7 +523,7 @@ class _HudIconButton extends StatelessWidget {
                 children: [
                   Icon(
                     effectiveIcon,
-                    size: 19,
+                    size: 28,
                     color: theme.hudText,
                   ),
                   if (label != null) ...[
@@ -558,7 +592,7 @@ class _QuickBookmarkRibbonButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(10.0),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 11.0, vertical: 10.0),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10.0),
             border: Border.all(
@@ -570,7 +604,7 @@ class _QuickBookmarkRibbonButton extends StatelessWidget {
             isBookmarked
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
-            size: 19,
+            size: 28,
             color: isBookmarked ? theme.bookmarkRibbon : theme.hudText,
           ),
         ),

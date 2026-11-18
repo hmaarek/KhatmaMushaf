@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/l10n.dart';
 import '../models/mushaf_models.dart';
 import '../services/tafsir_service.dart';
 import '../state/mushaf_controller.dart';
@@ -52,8 +53,11 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
   late int _selectedTabIndex;
   String? _selectedWordLocation;
 
-  SummaryTafsirSource _summarySource = SummaryTafsirSource.muyassar;
-  DetailedTafsirSource _detailedSource = DetailedTafsirSource.ibnKathir;
+  late SummaryTafsirSource _summarySource =
+      SummaryTafsirSource.forLanguage().first;
+  late DetailedTafsirSource _detailedSource =
+      DetailedTafsirSource.forLanguage().first;
+  AppLanguage _lang = L10n.language;
   double _tafsirFontSize = 16.5;
 
   Future<AyahWordMeaningsResult>? _wordMeaningsFuture;
@@ -74,6 +78,28 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
     _summaryFuture = TafsirService.instance.getSummaryTafsir(vk, _summarySource);
     _detailedFuture =
         TafsirService.instance.getDetailedTafsir(vk, _detailedSource);
+  }
+
+  /// Re-selects valid default sources when the language changes while open.
+  void _syncLanguage() {
+    if (_lang == L10n.language) return;
+    _lang = L10n.language;
+    _summarySource = SummaryTafsirSource.forLanguage().first;
+    _detailedSource = DetailedTafsirSource.forLanguage().first;
+    _loadAll();
+  }
+
+  String get _langName => tr('العربية', 'English');
+
+  String get _headerSubtitle {
+    final surah = widget.controller.getSurahById(widget.ayah.surahId);
+    final name = surah != null
+        ? L10n.surahName(surah)
+        : widget.ayah.surahNameArabic;
+    return tr(
+      'سورة $name • الآية ${L10n.n(widget.ayah.ayahNumber)} • ص ${L10n.n(widget.ayah.pageNumber)}',
+      '$name • Ayah ${L10n.n(widget.ayah.ayahNumber)} • p. ${L10n.n(widget.ayah.pageNumber)}',
+    );
   }
 
   void _changeSummarySource(SummaryTafsirSource source) {
@@ -103,13 +129,14 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
     return ListenableBuilder(
       listenable: widget.controller,
       builder: (context, _) {
+        _syncLanguage();
         final theme = widget.controller.theme;
         final audio = widget.controller.audioService;
         final isPlayingThisAyah = audio.isPlayingAyah &&
             audio.activeVerseKey == widget.ayah.verseKey;
 
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: L10n.dir,
           child: Container(
             height: MediaQuery.of(context).size.height * 0.88,
             decoration: BoxDecoration(
@@ -150,7 +177,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'بيان وتفسير الآية الكريمة',
+                                tr(tr('بيان وتفسير الآية الكريمة', 'Ayah Explanation & Tafsir'), 'Ayah Explanation & Tafsir'),
                                 style: TextStyle(
                                   color: theme.glyphColor,
                                   fontSize: 17,
@@ -158,7 +185,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                                 ),
                               ),
                               Text(
-                                'سورة ${widget.ayah.surahNameArabic} • الآية ${ArabicUtils.toArabicDigits(widget.ayah.ayahNumber)} • ص ${ArabicUtils.toArabicDigits(widget.ayah.pageNumber)}',
+                                _headerSubtitle,
                                 style: TextStyle(
                                   color: theme.ornamentPrimary,
                                   fontSize: 12.5,
@@ -204,7 +231,9 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                             size: 17,
                           ),
                           label: Text(
-                            isPlayingThisAyah ? 'إيقاف' : 'تلاوة الآية',
+                            isPlayingThisAyah
+                                ? tr('إيقاف', 'Stop')
+                                : tr(tr('تلاوة الآية', 'Recite Ayah'), 'Recite ayah'),
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
@@ -241,6 +270,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                       child: SingleChildScrollView(
                         child: Text(
                           '${widget.ayah.textUthmani} ﴿${ArabicUtils.toArabicDigits(widget.ayah.ayahNumber)}﴾',
+                          textDirection: L10n.dir,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: theme.glyphColor,
@@ -268,19 +298,19 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                         children: [
                           _buildTabButton(
                             index: 0,
-                            label: 'معاني الكلمات',
+                            label: tr(tr('معاني الكلمات', 'Word Meanings'), 'Word meanings'),
                             icon: Icons.translate_rounded,
                             theme: theme,
                           ),
                           _buildTabButton(
                             index: 1,
-                            label: 'المعنى الإجمالي',
+                            label: tr(tr('المعنى الإجمالي', 'Summary'), 'Summary meaning'),
                             icon: Icons.short_text_rounded,
                             theme: theme,
                           ),
                           _buildTabButton(
                             index: 2,
-                            label: 'التفسير التفصيلي',
+                            label: tr(tr('التفسير التفصيلي', 'Detailed Tafsir'), 'Detailed tafsir'),
                             icon: Icons.library_books_rounded,
                             theme: theme,
                           ),
@@ -368,13 +398,13 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
       future: _wordMeaningsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingView(theme, 'جاري تحميل معاني كلمات الآية...');
+          return _buildLoadingView(theme, tr('جاري تحميل معاني كلمات الآية...', 'Loading word meanings...'));
         }
         final data = snapshot.data;
         if (data == null || data.words.isEmpty) {
           return _buildErrorView(
             theme,
-            'تعذر تحميل معاني الكلمات',
+            tr(tr('تعذر تحميل معاني الكلمات', 'Could not load word meanings'), 'Could not load word meanings. Check your connection and try again.'),
             onRetry: () => setState(() {
               _wordMeaningsFuture = TafsirService.instance
                   .getWordMeaningsForAyah(widget.ayah.verseKey);
@@ -391,7 +421,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
           children: [
             // Interactive Word Selector Chips
             Text(
-              'المس أي كلمة لعرض معناها وسماع نطقها:',
+              tr('المس أي كلمة لعرض معناها وسماع نطقها:', 'Tap any word to see its meaning and hear it:'),
               style: TextStyle(
                 color: theme.secondaryTextColor,
                 fontSize: 12.5,
@@ -466,7 +496,8 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
             ],
 
             // Concise Arabic Vocabulary Overview of the Ayah (تنوير المقباس / الجلالين)
-            if (data.ayahVocabularyOverview != null &&
+            if (L10n.isAr &&
+                data.ayahVocabularyOverview != null &&
                 data.ayahVocabularyOverview!.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(14),
@@ -515,7 +546,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
 
             // Full Word-by-Word List
             Text(
-              'جميع كلمات الآية (${ArabicUtils.toArabicDigits(data.words.length)} كلمات):',
+              tr('جميع كلمات الآية (${L10n.n(data.words.length)} كلمات):', 'All words of the ayah (${L10n.n(data.words.length)}):'),
               style: TextStyle(
                 color: theme.glyphColor,
                 fontSize: 14.5,
@@ -573,21 +604,33 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'الكلمة رقم ${ArabicUtils.toArabicDigits(item.word.wordNumberInAyah)} في الآية',
+                        tr('الكلمة رقم ${L10n.n(item.word.wordNumberInAyah)} في الآية', 'Word ${L10n.n(item.word.wordNumberInAyah)} in the ayah'),
                         style: TextStyle(
                           color: theme.ornamentPrimary,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      Text(
-                        'الجذر اللغوي: (${item.arabicRoot})',
-                        style: TextStyle(
-                          color: theme.secondaryTextColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                      if (L10n.isAr)
+                        Text(
+                          'الجذر اللغوي: (${item.arabicRoot})',
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      else if (item.transliteration != null &&
+                          item.transliteration!.isNotEmpty)
+                        Text(
+                          item.transliteration!,
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -603,36 +646,52 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                 ),
                 onPressed: () => widget.controller.pronounceWord(item.word),
                 icon: const Icon(Icons.volume_up_rounded, size: 17),
-                label: const Text(
-                  'نطق الكلمة',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+                label: Text(
+                  tr('نطق الكلمة', 'Pronounce'),
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w800),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            item.arabicMeaning,
-            style: TextStyle(
-              color: theme.glyphColor,
-              fontSize: 15,
-              height: 1.55,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (item.englishMeaning != null &&
-              item.englishMeaning!.isNotEmpty) ...[
-            const SizedBox(height: 6),
+          if (L10n.isEn)
             Text(
-              'Meaning: ${item.englishMeaning!}'
-              '${item.transliteration != null ? " (${item.transliteration})" : ""}',
+              (item.englishMeaning != null && item.englishMeaning!.isNotEmpty)
+                  ? item.englishMeaning!
+                  : 'Meaning not available for this word',
               textDirection: TextDirection.ltr,
               style: TextStyle(
-                color: theme.secondaryTextColor,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+                color: theme.glyphColor,
+                fontSize: 17,
+                height: 1.4,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          else ...[
+            Text(
+              item.arabicMeaning,
+              style: TextStyle(
+                color: theme.glyphColor,
+                fontSize: 15,
+                height: 1.55,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            if (item.englishMeaning != null &&
+                item.englishMeaning!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Meaning: ${item.englishMeaning!}'
+                '${item.transliteration != null ? " (${item.transliteration})" : ""}',
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  color: theme.secondaryTextColor,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -677,7 +736,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                   border: Border.all(color: theme.pageInnerBorder),
                 ),
                 child: Text(
-                  ArabicUtils.toArabicDigits(item.word.wordNumberInAyah),
+                  L10n.n(item.word.wordNumberInAyah),
                   style: TextStyle(
                     color: theme.ornamentPrimary,
                     fontSize: 11.5,
@@ -712,6 +771,30 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (L10n.isEn) ...[
+                      Text(
+                        (item.englishMeaning ?? '').isNotEmpty
+                            ? item.englishMeaning!
+                            : '—',
+                        textDirection: TextDirection.ltr,
+                        style: TextStyle(
+                          color: theme.glyphColor,
+                          fontSize: 14.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if ((item.transliteration ?? '').isNotEmpty)
+                        Text(
+                          item.transliteration!,
+                          textDirection: TextDirection.ltr,
+                          style: TextStyle(
+                            color: theme.ornamentPrimary,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ] else ...[
                     Text(
                       item.arabicMeaning,
                       style: TextStyle(
@@ -750,6 +833,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                         ],
                       ],
                     ),
+                    ],
                   ],
                 ),
               ),
@@ -783,11 +867,11 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 6,
-                  children: SummaryTafsirSource.values.map((source) {
+                  children: SummaryTafsirSource.forLanguage().map((source) {
                     final isSelected = _summarySource == source;
                     return ChoiceChip(
                       label: Text(
-                        source.arabicTitle,
+                        source.title,
                         style: TextStyle(
                           color: isSelected ? Colors.white : theme.glyphColor,
                           fontSize: 12.5,
@@ -820,13 +904,13 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return _buildLoadingView(
                   theme,
-                  'جاري تحميل ${_summarySource.arabicTitle}...',
+                  tr('جاري تحميل ${_summarySource.title}...', 'Loading ${_summarySource.title}...'),
                 );
               }
               if (snapshot.hasError || !snapshot.hasData) {
                 return _buildErrorView(
                   theme,
-                  'يتطلب تحميل التفسير للمرة الأولى الاتصال بالإنترنت (ويُحفظ بعدها تلقائياً للقراءة بدون إنترنت)',
+                  _tafsirErrorMessage(detailed: false),
                   onRetry: () => setState(() {
                     _summaryFuture = TafsirService.instance.getSummaryTafsir(
                       widget.ayah.verseKey,
@@ -857,13 +941,13 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: DetailedTafsirSource.values.map((source) {
+                    children: DetailedTafsirSource.forLanguage().map((source) {
                       final isSelected = _detailedSource == source;
                       return Padding(
                         padding: const EdgeInsets.only(left: 8.0),
                         child: ChoiceChip(
                           label: Text(
-                            source.arabicTitle,
+                            source.title,
                             style: TextStyle(
                               color:
                                   isSelected ? Colors.white : theme.glyphColor,
@@ -900,13 +984,13 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return _buildLoadingView(
                   theme,
-                  'جاري تحميل ${_detailedSource.arabicTitle}...',
+                  tr('جاري تحميل ${_detailedSource.title}...', 'Loading ${_detailedSource.title}...'),
                 );
               }
               if (snapshot.hasError || !snapshot.hasData) {
                 return _buildErrorView(
                   theme,
-                  'يتطلب تحميل التفسير التفصيلي للمرة الأولى الاتصال بالإنترنت (ويُحفظ بعدها تلقائياً على جهازك)',
+                  _tafsirErrorMessage(detailed: true),
                   onRetry: () => setState(() {
                     _detailedFuture = TafsirService.instance.getDetailedTafsir(
                       widget.ayah.verseKey,
@@ -923,13 +1007,20 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
     );
   }
 
+  String _tafsirErrorMessage({required bool detailed}) {
+    return tr(
+      'يتطلب تحميل التفسير للمرة الأولى الاتصال بالإنترنت (ويُحفظ بعدها تلقائياً للقراءة بدون إنترنت)',
+      'Tafsir is not available for this ayah in $_langName right now. The first load needs an internet connection (it is then saved for offline reading). Please check your connection and retry.',
+    );
+  }
+
   Widget _buildFontZoomButtons(MushafThemeData theme) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'تصغير الخط',
+          tooltip: tr('تصغير الخط', 'Decrease font size'),
           icon: Icon(
             Icons.text_decrease_rounded,
             size: 18,
@@ -943,7 +1034,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'تكبير الخط',
+          tooltip: tr('تكبير الخط', 'Increase font size'),
           icon: Icon(
             Icons.text_increase_rounded,
             size: 19,
@@ -1003,9 +1094,17 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                 ),
                 TextButton.icon(
                   onPressed: () async {
-                    final textToCopy =
-                        '﴿ ${widget.ayah.textUthmani} ﴾ [سورة ${widget.ayah.surahNameArabic}: ${ArabicUtils.toArabicDigits(widget.ayah.ayahNumber)}]\n\n'
-                        '【${result.title}】:\n${result.text}';
+                    final surah =
+                        widget.controller.getSurahById(widget.ayah.surahId);
+                    final surahLabel = surah != null
+                        ? L10n.surahName(surah)
+                        : widget.ayah.surahNameArabic;
+                    final textToCopy = tr(
+                      '﴿ ${widget.ayah.textUthmani} ﴾ [سورة $surahLabel: ${L10n.n(widget.ayah.ayahNumber)}]\n\n'
+                          '【${result.title}】:\n${result.text}',
+                      '﴿ ${widget.ayah.textUthmani} ﴾ [$surahLabel: ${widget.ayah.ayahNumber}]\n\n'
+                          '[${result.title}]:\n${result.text}',
+                    );
                     await Clipboard.setData(ClipboardData(text: textToCopy));
                     if (!mounted) return;
                     ScaffoldMessenger.of(context)
@@ -1016,9 +1115,9 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: theme.hudSurface,
                           content: Directionality(
-                            textDirection: TextDirection.rtl,
+                            textDirection: L10n.dir,
                             child: Text(
-                              'تم نسخ التفسير مع الآية الكريمة',
+                              tr('تم نسخ التفسير مع الآية الكريمة', 'Tafsir copied with the ayah'),
                               style: TextStyle(color: theme.hudText),
                             ),
                           ),
@@ -1031,7 +1130,7 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
                     color: theme.ornamentPrimary,
                   ),
                   label: Text(
-                    'نسخ',
+                    tr('نسخ', 'Copy'),
                     style: TextStyle(
                       color: theme.ornamentPrimary,
                       fontSize: 12.5,
@@ -1047,6 +1146,9 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
             ),
             SelectableText(
               result.text,
+              textDirection:
+                  result.isEnglish ? TextDirection.ltr : TextDirection.rtl,
+              textAlign: result.isEnglish ? TextAlign.left : TextAlign.right,
               style: TextStyle(
                 color: theme.glyphColor,
                 fontSize: _tafsirFontSize,
@@ -1118,9 +1220,9 @@ class _AyahExplanationSheetState extends State<AyahExplanationSheet> {
               ),
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text(
-                'إعادة المحاولة',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              label: Text(
+                tr(tr('إعادة المحاولة', 'Retry'), 'Retry'),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           ],

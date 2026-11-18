@@ -12,9 +12,14 @@ class ArabicUtils {
     '٩',
   ];
 
-  /// Converts Western digits (0-9) to Eastern Arabic-Indic digits (٠-٩).
+  /// Set by `L10n` consumers: when true, digits stay Western (English UI).
+  static bool useWesternDigits = false;
+
+  /// Converts Western digits (0-9) to Eastern Arabic-Indic digits (٠-٩)
+  /// (unless the app language is English, in which case digits are unchanged).
   static String toArabicDigits(Object value) {
     final s = value.toString();
+    if (useWesternDigits) return s;
     final buffer = StringBuffer();
     for (int i = 0; i < s.length; i++) {
       final code = s.codeUnitAt(i);

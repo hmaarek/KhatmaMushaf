@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../models/mushaf_models.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
@@ -43,7 +44,7 @@ class _BookmarksSheetState extends State<BookmarksSheet>
         final ayahBookmarks = widget.controller.ayahBookmarks;
 
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: L10n.dir,
           child: Container(
             height: MediaQuery.of(context).size.height * 0.80,
             decoration: BoxDecoration(
@@ -69,7 +70,7 @@ class _BookmarksSheetState extends State<BookmarksSheet>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'العلامات المرجعية',
+                        tr(tr('العلامات المرجعية', 'Bookmarks'), 'Bookmarks'),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 18,
@@ -107,11 +108,11 @@ class _BookmarksSheetState extends State<BookmarksSheet>
                     tabs: [
                       Tab(
                         text:
-                            'الصفحات (${ArabicUtils.toArabicDigits(pageBookmarks.length)})',
+                            tr('الصفحات (${ArabicUtils.toArabicDigits(pageBookmarks.length)})', 'Pages (${pageBookmarks.length})'),
                       ),
                       Tab(
                         text:
-                            'الآيات (${ArabicUtils.toArabicDigits(ayahBookmarks.length)})',
+                            tr('الآيات (${ArabicUtils.toArabicDigits(ayahBookmarks.length)})', 'Ayahs (${ayahBookmarks.length})'),
                       ),
                     ],
                   ),
@@ -124,13 +125,13 @@ class _BookmarksSheetState extends State<BookmarksSheet>
                       _buildBookmarkList(
                         items: pageBookmarks,
                         emptyText:
-                            'لا توجد صفحات محفوظة بعد.\nاضغط على أيقونة الشريط في الأعلى لحفظ الصفحة الحالية.',
+                            tr('لا توجد صفحات محفوظة بعد.\nاضغط على أيقونة الشريط في الأعلى لحفظ الصفحة الحالية.', 'No saved pages yet.\nTap the ribbon icon at the top to save the current page.'),
                         theme: theme,
                       ),
                       _buildBookmarkList(
                         items: ayahBookmarks,
                         emptyText:
-                            'لا توجد آيات محفوظة بعد.\nاضغط مطولاً على أي آية في الصفحة لحفظها أو نسخها.',
+                            tr('لا توجد آيات محفوظة بعد.\nاضغط مطولاً على أي آية في الصفحة لحفظها أو نسخها.', 'No saved ayahs yet.\nLong-press any ayah on the page to save or copy it.'),
                         theme: theme,
                       ),
                     ],
@@ -142,6 +143,24 @@ class _BookmarksSheetState extends State<BookmarksSheet>
         );
       },
     );
+  }
+
+  String _titleFor(BookmarkItem item) {
+    if (L10n.isAr) return item.title;
+    final s = widget.controller.getSurahById(item.surahId);
+    final name = s == null ? '' : L10n.surahName(s);
+    if (item.isAyahBookmark && item.ayahNumber != null) {
+      return '$name \u2022 Ayah ${item.ayahNumber}';
+    }
+    final juzList = widget.controller.juzs;
+    int? juz;
+    for (final j in juzList) {
+      if (item.pageNumber >= j.startPage && item.pageNumber <= j.endPage) {
+        juz = j.id;
+        break;
+      }
+    }
+    return 'Page ${item.pageNumber}${juz != null ? ' \u2022 Juz $juz' : ''}';
   }
 
   Widget _buildBookmarkList({
@@ -205,7 +224,7 @@ class _BookmarksSheetState extends State<BookmarksSheet>
             children: [
               Flexible(
                 child: Text(
-                  item.title,
+                  _titleFor(item),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -224,7 +243,7 @@ class _BookmarksSheetState extends State<BookmarksSheet>
                   border: Border.all(color: theme.pageInnerBorder),
                 ),
                 child: Text(
-                  'ص ${ArabicUtils.toArabicDigits(item.pageNumber)}',
+                  tr('ص ${ArabicUtils.toArabicDigits(item.pageNumber)}', 'p. ${item.pageNumber}'),
                   style: TextStyle(
                     color: theme.secondaryTextColor,
                     fontSize: 11.5,
@@ -237,7 +256,9 @@ class _BookmarksSheetState extends State<BookmarksSheet>
           subtitle: item.snippet != null
               ? Padding(
                   padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(
+                  child: Directionality(
+                    textDirection: L10n.dir,
+                    child: Text(
                     item.snippet!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -247,10 +268,11 @@ class _BookmarksSheetState extends State<BookmarksSheet>
                       height: 1.5,
                     ),
                   ),
+                  ),
                 )
               : null,
           trailing: IconButton(
-            tooltip: 'حذف',
+            tooltip: tr('حذف', 'Delete'),
             icon: Icon(
               Icons.delete_outline_rounded,
               color: theme.secondaryTextColor,

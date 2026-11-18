@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:sqflite/sqflite.dart';
 
+import '../l10n/l10n.dart';
 import '../models/mushaf_models.dart';
 import '../utils/arabic_utils.dart';
 import 'database_service.dart';
@@ -24,6 +25,22 @@ enum SummaryTafsirSource {
     arabicAuthor: 'بيان وجيز لمعاني الآية ومفرداتها',
     quranComResourceId: null,
     alQuranCloudEdition: 'ar.jalalayn',
+  ),
+  enSahih(
+    id: 'en_sahih',
+    arabicTitle: 'Saheeh International translation',
+    arabicAuthor: 'Saheeh International',
+    quranComResourceId: null,
+    alQuranCloudEdition: 'en.sahih',
+    isEnglish: true,
+  ),
+  enTazkirul(
+    id: 'en_tazkirul',
+    arabicTitle: 'Tazkirul Quran',
+    arabicAuthor: 'Maulana Wahiduddin Khan',
+    quranComResourceId: 817,
+    alQuranCloudEdition: null,
+    isEnglish: true,
   );
 
   final String id;
@@ -31,6 +48,7 @@ enum SummaryTafsirSource {
   final String arabicAuthor;
   final int? quranComResourceId;
   final String? alQuranCloudEdition;
+  final bool isEnglish;
 
   const SummaryTafsirSource({
     required this.id,
@@ -38,7 +56,16 @@ enum SummaryTafsirSource {
     required this.arabicAuthor,
     required this.quranComResourceId,
     required this.alQuranCloudEdition,
+    this.isEnglish = false,
   });
+
+  String get title => arabicTitle;
+  String get author => arabicAuthor;
+
+  /// Sources matching the active UI language.
+  static List<SummaryTafsirSource> forLanguage() => values
+      .where((s) => s.isEnglish == L10n.isEn)
+      .toList(growable: false);
 }
 
 /// Authoritative Detailed Tafsir sources for the "التفسير التفصيلي" tab
@@ -78,6 +105,22 @@ enum DetailedTafsirSource {
     arabicAuthor: 'مجمع البحوث الإسلامية بالأزهر الشريف',
     quranComResourceId: 93,
     alQuranCloudEdition: 'ar.waseet',
+  ),
+  enIbnKathir(
+    id: 'en_ibn_kathir',
+    arabicTitle: 'Ibn Kathir (Abridged)',
+    arabicAuthor: 'Hafiz Ibn Kathir (Tafsir al-Qur\'an al-Azim, abridged)',
+    quranComResourceId: 169,
+    alQuranCloudEdition: null,
+    isEnglish: true,
+  ),
+  enMaarif(
+    id: 'en_maarif',
+    arabicTitle: 'Ma\'arif al-Qur\'an',
+    arabicAuthor: 'Mufti Muhammad Shafi',
+    quranComResourceId: 168,
+    alQuranCloudEdition: null,
+    isEnglish: true,
   );
 
   final String id;
@@ -85,6 +128,7 @@ enum DetailedTafsirSource {
   final String arabicAuthor;
   final int? quranComResourceId;
   final String? alQuranCloudEdition;
+  final bool isEnglish;
 
   const DetailedTafsirSource({
     required this.id,
@@ -92,7 +136,16 @@ enum DetailedTafsirSource {
     required this.arabicAuthor,
     required this.quranComResourceId,
     required this.alQuranCloudEdition,
+    this.isEnglish = false,
   });
+
+  String get title => arabicTitle;
+  String get author => arabicAuthor;
+
+  /// Sources matching the active UI language.
+  static List<DetailedTafsirSource> forLanguage() => values
+      .where((s) => s.isEnglish == L10n.isEn)
+      .toList(growable: false);
 }
 
 class WordMeaningItem {
@@ -134,6 +187,7 @@ class TafsirTextResult {
   final String verseKey;
   final String text;
   final bool isCachedOffline;
+  final bool isEnglish;
 
   const TafsirTextResult({
     required this.sourceId,
@@ -142,6 +196,7 @@ class TafsirTextResult {
     required this.verseKey,
     required this.text,
     required this.isCachedOffline,
+    this.isEnglish = false,
   });
 }
 
@@ -188,11 +243,12 @@ class TafsirService {
     );
     return TafsirTextResult(
       sourceId: source.id,
-      title: source.arabicTitle,
-      author: source.arabicAuthor,
+      title: source.title,
+      author: source.author,
       verseKey: verseKey,
       text: text.content,
       isCachedOffline: text.fromCache,
+      isEnglish: source.isEnglish,
     );
   }
 
@@ -209,11 +265,12 @@ class TafsirService {
     );
     return TafsirTextResult(
       sourceId: source.id,
-      title: source.arabicTitle,
-      author: source.arabicAuthor,
+      title: source.title,
+      author: source.author,
       verseKey: verseKey,
       text: text.content,
       isCachedOffline: text.fromCache,
+      isEnglish: source.isEnglish,
     );
   }
 
@@ -406,7 +463,7 @@ class TafsirService {
     // Fetch Quran.com v4 word-by-word glosses and AlQuran.cloud vocabulary edition in parallel
     final results = await Future.wait<Object?>([
       _httpGetJson(
-        'https://api.quran.com/api/v4/verses/by_key/$verseKey?language=en&words=true&word_fields=text_uthmani,location',
+        'https://api.quran.com/api/v4/verses/by_key/$verseKey?language=${L10n.isUr ? 'ur' : 'en'}&words=true&word_fields=text_uthmani,location',
       ),
       _fetchFromAlQuranCloud('ar.miqbas', verseKey),
       _fetchFromAlQuranCloud('ar.jalalayn', verseKey),
@@ -494,6 +551,8 @@ class TafsirService {
         // Replace paragraph and break tags with newlines
         .replaceAll(RegExp(r'</p\s*>', caseSensitive: false), '\n\n')
         .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '\n• ')
+        .replaceAll(RegExp(r'</(ul|ol|blockquote)\s*>', caseSensitive: false), '\n\n')
         .replaceAll(RegExp(r'</div\s*>', caseSensitive: false), '\n\n')
         .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
         .replaceAll(RegExp(r'</h[1-6]\s*>', caseSensitive: false), '\n')
@@ -505,7 +564,12 @@ class TafsirService {
         .replaceAll('&amp;', '&')
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>')
-        .replaceAll('&#39;', "'");
+        .replaceAll('&#39;', "'")
+        .replaceAll('&rsquo;', '\u2019')
+        .replaceAll('&lsquo;', '\u2018')
+        .replaceAll('&ldquo;', '\u201C')
+        .replaceAll('&rdquo;', '\u201D')
+        .replaceAll('&#x27;', "'");
 
     // Normalize multiple blank lines
     s = s.replaceAll(RegExp(r'[ \t]+\n'), '\n');

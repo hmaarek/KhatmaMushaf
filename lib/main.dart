@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'l10n/l10n.dart';
 import 'screens/reader_screen.dart';
 import 'state/mushaf_controller.dart';
 
@@ -37,6 +39,17 @@ class MushafApp extends StatelessWidget {
           return MaterialApp(
             title: 'مصحف الختمة - Khatma Mushaf',
             debugShowCheckedModeBanner: false,
+            locale: L10n.locale,
+            supportedLocales: const [Locale('ar'), Locale('en'), Locale('ur')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            builder: (context, child) => Directionality(
+              textDirection: L10n.dir,
+              child: child ?? const SizedBox.shrink(),
+            ),
             theme: ThemeData(
               useMaterial3: true,
               brightness: theme.brightness,

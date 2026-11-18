@@ -1,3 +1,4 @@
+import '../l10n/l10n.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -93,7 +94,7 @@ class _SearchSheetState extends State<SearchSheet> {
     final theme = widget.controller.theme;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: L10n.dir,
       child: Container(
         height: MediaQuery.of(context).size.height * 0.90,
         decoration: BoxDecoration(
@@ -126,7 +127,7 @@ class _SearchSheetState extends State<SearchSheet> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'البحث الذكي في القرآن الكريم',
+                        tr('البحث الذكي في القرآن الكريم', 'Smart Quran Search'),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 17.5,
@@ -886,7 +887,7 @@ class _SmartResultCard extends StatelessWidget {
     );
 
     return RichText(
-      textDirection: TextDirection.rtl,
+      textDirection: L10n.dir,
       text: TextSpan(
         style: TextStyle(
           color: theme.glyphColor,

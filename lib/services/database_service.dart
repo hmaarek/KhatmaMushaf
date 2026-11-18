@@ -319,4 +319,27 @@ class DatabaseService {
     final db = await database;
     await db.delete('bookmarks', where: 'id = ?', whereArgs: [id]);
   }
+
+  /// Returns `(verseKey, ayahNumber, textIndopak)` for all ayahs on [pageNumber].
+  Future<List<({String verseKey, int surahId, int ayahNumber, String textIndopak})>>
+      getIndoPakVersesForPage(int pageNumber) async {
+    final db = await database;
+    final rows = await db.query(
+      'ayahs',
+      columns: ['verse_key', 'surah_id', 'ayah_number', 'text_indopak', 'text_uthmani'],
+      where: 'page_number = ?',
+      whereArgs: [pageNumber],
+      orderBy: 'id ASC',
+    );
+    return rows.map((r) {
+      final ip = (r['text_indopak'] as String?) ?? (r['text_uthmani'] as String? ?? '');
+      return (
+        verseKey: r['verse_key'] as String,
+        surahId: r['surah_id'] as int,
+        ayahNumber: r['ayah_number'] as int,
+        textIndopak: ip,
+      );
+    }).toList(growable: false);
+  }
+
 }

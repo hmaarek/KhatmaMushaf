@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
 import '../utils/arabic_utils.dart';
@@ -44,7 +45,7 @@ class _IndexSheetState extends State<IndexSheet>
     final theme = widget.controller.theme;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: L10n.dir,
       child: Container(
         height: MediaQuery.of(context).size.height * 0.86,
         decoration: BoxDecoration(
@@ -69,7 +70,7 @@ class _IndexSheetState extends State<IndexSheet>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'فهرس المصحف الشريف',
+                    tr(tr('فهرس المصحف الشريف', 'Quran Index'), 'Quran Index'),
                     style: TextStyle(
                       color: theme.glyphColor,
                       fontSize: 18,
@@ -104,10 +105,10 @@ class _IndexSheetState extends State<IndexSheet>
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                 ),
-                tabs: const [
-                  Tab(text: 'السور (١١٤)'),
-                  Tab(text: 'الأجزاء (٣٠)'),
-                  Tab(text: 'انتقال لصفحة'),
+                tabs: [
+                  Tab(text: tr(tr('السور (١١٤)', 'Surahs (114)'), 'Surahs (114)')),
+                  Tab(text: tr(tr('الأجزاء (٣٠)', 'Juz (30)'), 'Juz (30)')),
+                  Tab(text: tr('انتقال لصفحة', 'Go to page')),
                 ],
               ),
             ),
@@ -130,19 +131,23 @@ class _IndexSheetState extends State<IndexSheet>
 
   Widget _buildSurahsTab(MushafThemeData theme) {
     final allSurahs = widget.controller.surahs;
+    String flat(String x) => x
+        .toLowerCase()
+        .replaceAll(RegExp("[-'\u2019\u2018`\\s]"), '');
     final cleanFilter =
         ArabicUtils.normalizeForSearch(_surahQuery).toLowerCase();
+    final enFilter = flat(_surahQuery);
 
     final filtered = cleanFilter.isEmpty
         ? allSurahs
         : allSurahs.where((s) {
             final arNorm = ArabicUtils.normalizeForSearch(s.nameArabic);
-            final enNorm = s.nameEnglish.toLowerCase();
-            final trNorm = s.nameTranslation.toLowerCase();
+            final enNorm = flat(s.nameEnglish);
+            final trNorm = flat(s.nameTranslation);
             final idStr = s.id.toString();
             return arNorm.contains(cleanFilter) ||
-                enNorm.contains(cleanFilter) ||
-                trNorm.contains(cleanFilter) ||
+                (enFilter.isNotEmpty &&
+                    (enNorm.contains(enFilter) || trNorm.contains(enFilter))) ||
                 idStr == cleanFilter;
           }).toList(growable: false);
 
@@ -155,7 +160,7 @@ class _IndexSheetState extends State<IndexSheet>
             onChanged: (v) => setState(() => _surahQuery = v),
             style: TextStyle(color: theme.glyphColor, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'ابحث باسم السورة أو رقمها (١ - ١١٤)...',
+              hintText: tr('ابحث باسم السورة أو رقمها (١ - ١١٤)...', 'Search by Surah name or number (1 - 114)...'),
               hintStyle: TextStyle(
                 color: theme.secondaryTextColor.withValues(alpha: 0.7),
                 fontSize: 13.5,
@@ -247,14 +252,15 @@ class _IndexSheetState extends State<IndexSheet>
                 ),
                 title: Row(
                   children: [
-                    Text(
-                      'سورة ${surah.nameArabic}',
+                    Flexible(child: Text(
+                      tr(L10n.isEn ? '${surah.nameEnglish} (${surah.nameTranslation})' : 'سورة ${surah.nameArabic}', surah.nameEnglish),
                       style: TextStyle(
                         color: theme.glyphColor,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
+                      overflow: TextOverflow.ellipsis,
+                    )),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -266,7 +272,7 @@ class _IndexSheetState extends State<IndexSheet>
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        surah.revelationArabic,
+                        L10n.revelation(surah),
                         style: TextStyle(
                           color: theme.ornamentPrimary,
                           fontSize: 11,
@@ -277,7 +283,7 @@ class _IndexSheetState extends State<IndexSheet>
                   ],
                 ),
                 subtitle: Text(
-                  '${surah.nameEnglish} (${surah.nameTranslation}) • ${ArabicUtils.toArabicDigits(surah.ayahCount)} آية',
+                  tr('${surah.nameEnglish} (${surah.nameTranslation}) • ${ArabicUtils.toArabicDigits(surah.ayahCount)} آية', '${surah.nameTranslation} • ${surah.ayahCount} ayahs'),
                   style: TextStyle(
                     color: theme.secondaryTextColor,
                     fontSize: 12,
@@ -299,7 +305,7 @@ class _IndexSheetState extends State<IndexSheet>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'ص ${ArabicUtils.toArabicDigits(surah.startPage)}',
+                      tr(tr('ص ${ArabicUtils.toArabicDigits(surah.startPage)}', 'p. ${surah.startPage}'), 'p. ${surah.startPage}'),
                       style: TextStyle(
                         color: theme.secondaryTextColor,
                         fontSize: 11.5,
@@ -363,7 +369,7 @@ class _IndexSheetState extends State<IndexSheet>
             ),
           ),
           title: Text(
-            juz.nameArabic,
+            tr(juz.nameArabic, 'Juz ${juz.id}'),
             style: TextStyle(
               color: theme.glyphColor,
               fontSize: 16,
@@ -371,7 +377,7 @@ class _IndexSheetState extends State<IndexSheet>
             ),
           ),
           subtitle: Text(
-            'يبدأ من سورة ${juz.startSurahNameArabic} (${juz.startSurahNameEnglish}) • الآية ${ArabicUtils.toArabicDigits(juz.startAyah)}',
+            tr('يبدأ من سورة ${juz.startSurahNameArabic} (${juz.startSurahNameEnglish}) • الآية ${ArabicUtils.toArabicDigits(juz.startAyah)}', 'Starts at Surah ${juz.startSurahNameEnglish} • Ayah ${juz.startAyah}'),
             style: TextStyle(
               color: theme.secondaryTextColor,
               fontSize: 12,
@@ -385,7 +391,7 @@ class _IndexSheetState extends State<IndexSheet>
               border: Border.all(color: theme.pageInnerBorder),
             ),
             child: Text(
-              'ص ${ArabicUtils.toArabicDigits(juz.startPage)}',
+              tr(tr('ص ${ArabicUtils.toArabicDigits(juz.startPage)}', 'p. ${juz.startPage}'), 'p. ${juz.startPage}'),
               style: TextStyle(
                 color: theme.glyphColor,
                 fontSize: 12.5,
@@ -400,15 +406,15 @@ class _IndexSheetState extends State<IndexSheet>
 
   Widget _buildPageJumpTab(MushafThemeData theme) {
     final presets = <({String label, String sub, int page})>[
-      (label: 'سورة الفاتحة', sub: 'بداية المصحف', page: 1),
-      (label: 'سورة البقرة', sub: 'الجزء الأول', page: 2),
-      (label: 'سورة الكهف', sub: 'الجزء الخامس عشر', page: 293),
-      (label: 'سورة يس', sub: 'الجزء الثاني والعشرون', page: 440),
-      (label: 'سورة الرحمن', sub: 'الجزء السابع والعشرون', page: 531),
-      (label: 'سورة الواقعة', sub: 'الجزء السابع والعشرون', page: 534),
-      (label: 'سورة الملك', sub: 'الجزء التاسع والعشرون', page: 562),
-      (label: 'جزء عمّ', sub: 'الجزء الثلاثون', page: 582),
-      (label: 'ختم المصحف', sub: 'سورة الناس', page: 604),
+      (label: tr('سورة الفاتحة', 'Surah Al-Fatihah'), sub: tr('بداية المصحف', 'Start of the Mushaf'), page: 1),
+      (label: tr('سورة البقرة', 'Surah Al-Baqarah'), sub: tr('الجزء الأول', 'Juz 1'), page: 2),
+      (label: tr('سورة الكهف', 'Surah Al-Kahf'), sub: tr('الجزء الخامس عشر', 'Juz 15'), page: 293),
+      (label: tr('سورة يس', 'Surah Ya-Sin'), sub: tr('الجزء الثاني والعشرون', 'Juz 22'), page: 440),
+      (label: tr('سورة الرحمن', 'Surah Ar-Rahman'), sub: tr('الجزء السابع والعشرون', 'Juz 27'), page: 531),
+      (label: tr('سورة الواقعة', "Surah Al-Waqi'ah"), sub: tr('الجزء السابع والعشرون', 'Juz 27'), page: 534),
+      (label: tr('سورة الملك', 'Surah Al-Mulk'), sub: tr('الجزء التاسع والعشرون', 'Juz 29'), page: 562),
+      (label: tr('جزء عمّ', 'Juz Amma'), sub: tr('الجزء الثلاثون', 'Juz 30'), page: 582),
+      (label: tr('ختم المصحف', 'Complete the Quran'), sub: tr('سورة الناس', 'Surah An-Nas'), page: 604),
     ];
 
     return SingleChildScrollView(
@@ -427,7 +433,7 @@ class _IndexSheetState extends State<IndexSheet>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'أدخل رقم الصفحة (١ إلى ٦٠٤)',
+                  tr('أدخل رقم الصفحة (١ إلى ٦٠٤)', 'Enter page number (1 to 604)'),
                   style: TextStyle(
                     color: theme.glyphColor,
                     fontSize: 15,
@@ -480,9 +486,13 @@ class _IndexSheetState extends State<IndexSheet>
                         ),
                       ),
                       onPressed: _submitPageJump,
-                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                      label: const Text(
-                        'انتقال',
+                      icon: Icon(
+                          L10n.isEn
+                              ? Icons.arrow_forward_rounded
+                              : Icons.arrow_back_rounded,
+                          size: 18),
+                      label: Text(
+                        tr('انتقال', 'Go'),
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -496,7 +506,7 @@ class _IndexSheetState extends State<IndexSheet>
           ),
           const SizedBox(height: 18),
           Text(
-            'وصول سريع',
+            tr('وصول سريع', 'Quick access'),
             style: TextStyle(
               color: theme.secondaryTextColor,
               fontSize: 14,
@@ -548,7 +558,7 @@ class _IndexSheetState extends State<IndexSheet>
                         ),
                       ),
                       Text(
-                        'ص ${ArabicUtils.toArabicDigits(item.page)}',
+                        tr('ص ${ArabicUtils.toArabicDigits(item.page)}', 'p. ${item.page}'),
                         style: TextStyle(
                           color: theme.ornamentPrimary,
                           fontSize: 12.5,
@@ -582,7 +592,7 @@ class _IndexSheetState extends State<IndexSheet>
     final parsed = int.tryParse(raw);
     if (parsed == null || parsed < 1 || parsed > 604) {
       setState(() {
-        _pageError = 'الرجاء إدخال رقم صفحة صحيح بين ١ و ٦٠٤';
+        _pageError = tr('الرجاء إدخال رقم صفحة صحيح بين ١ و ٦٠٤', 'Please enter a valid page number between 1 and 604');
       });
       return;
     }

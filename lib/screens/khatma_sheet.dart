@@ -7,6 +7,7 @@ import '../models/mushaf_models.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
 import '../utils/arabic_utils.dart';
+import '../utils/mushaf_date_utils.dart';
 
 /// Shows the app startup dialog asking the user whether to:
 /// 1. Continue the last active Khatma (if one is active),
@@ -36,9 +37,7 @@ Future<KhatmaRecord?> showStartNewKhatmaDialog(
   return showDialog<KhatmaRecord>(
     context: context,
     barrierDismissible: true,
-    builder: (dialogCtx) => _StartNewKhatmaDialog(
-      controller: controller,
-    ),
+    builder: (dialogCtx) => _StartNewKhatmaDialog(controller: controller),
   );
 }
 
@@ -66,10 +65,7 @@ Future<void> showKhatmaReportModal(
 class KhatmaSheet extends StatefulWidget {
   final MushafController controller;
 
-  const KhatmaSheet({
-    super.key,
-    required this.controller,
-  });
+  const KhatmaSheet({super.key, required this.controller});
 
   @override
   State<KhatmaSheet> createState() => _KhatmaSheetState();
@@ -106,8 +102,9 @@ class _KhatmaSheetState extends State<KhatmaSheet>
             height: MediaQuery.of(context).size.height * 0.88,
             decoration: BoxDecoration(
               color: theme.pageBackground,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               border: Border.all(color: theme.pageOuterBorder, width: 1.4),
             ),
             child: Column(
@@ -178,8 +175,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                     tabs: [
                       Tab(text: tr('الختمة الحالية', 'Current Khatma')),
                       Tab(
-                        text:
-                            tr('الختمات المكتملة (${ArabicUtils.toArabicDigits(completedList.length)})', 'Completed (${completedList.length})'),
+                        text: tr(
+                          'الختمات المكتملة (${ArabicUtils.toArabicDigits(completedList.length)})',
+                          'Completed (${completedList.length})',
+                        ),
                       ),
                     ],
                   ),
@@ -234,10 +233,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                 height: 140,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: theme.ornamentPrimary,
-                    width: 1.6,
-                  ),
+                  border: Border.all(color: theme.ornamentPrimary, width: 1.6),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.18),
@@ -257,7 +253,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
               ),
               const SizedBox(height: 14),
               Text(
-                tr('ابدأ الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}', 'Start Khatma #$nextSerial'),
+                tr(
+                  'ابدأ الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                  'Start Khatma #$nextSerial',
+                ),
                 style: TextStyle(
                   color: theme.glyphColor,
                   fontSize: 19,
@@ -302,7 +301,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                           content: Directionality(
                             textDirection: L10n.dir,
                             child: Text(
-                              tr('بدأت ${created.displayTitle} على بركة الله!', '${created.displayTitle} started!'),
+                              tr(
+                                'بدأت ${created.displayTitle} على بركة الله!',
+                                '${created.displayTitle} started!',
+                              ),
                               style: TextStyle(color: theme.hudText),
                             ),
                           ),
@@ -311,7 +313,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                   },
                   icon: const Icon(Icons.play_arrow_rounded, size: 22),
                   label: Text(
-                    tr('بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)} الآن', 'Start Khatma #$nextSerial Now'),
+                    tr(
+                      'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)} الآن',
+                      'Start Khatma #$nextSerial Now',
+                    ),
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -334,6 +339,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
     final mark = khatma.currentMark;
     final prevMark = khatma.previousMark;
     final percent = (khatma.progressRatio * 100).clamp(0.0, 100.0);
+    final liveReport = widget.controller.generateKhatmaReport(khatma);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
@@ -409,14 +415,117 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                tr('تاريخ ووقت البدء: ', 'Started: ') + _formatDateTimeArabic(khatma.startedAt),
-                style: TextStyle(
-                  color: theme.secondaryTextColor,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(height: 10),
+              // Start Date & Estimated Finish Date (Hijri above Gregorian, dd-MonthName-Year, no time)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.pageBackground,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: theme.pageInnerBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('تاريخ البدء', 'Start Date', 'تاریخِ آغاز'),
+                            style: TextStyle(
+                              color: theme.secondaryTextColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            MushafDateUtils.formatHijri(khatma.startedAt),
+                            style: TextStyle(
+                              color: theme.ornamentPrimary,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            MushafDateUtils.formatGregorian(khatma.startedAt),
+                            style: TextStyle(
+                              color: theme.glyphColor,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.pageBackground,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: theme.pageInnerBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr(
+                              'التاريخ المتوقع للختم',
+                              'Est. Finish Date',
+                              'متوقع تاریخِ تکمیل',
+                            ),
+                            style: TextStyle(
+                              color: theme.secondaryTextColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (liveReport.estimatedCompletionDate != null) ...[
+                            Text(
+                              MushafDateUtils.formatHijri(
+                                liveReport.estimatedCompletionDate!,
+                              ),
+                              style: const TextStyle(
+                                color: Color(0xFF2B8A62),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              MushafDateUtils.formatGregorian(
+                                liveReport.estimatedCompletionDate!,
+                              ),
+                              style: TextStyle(
+                                color: theme.glyphColor,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ] else
+                            Text(
+                              tr(
+                                'حدد علامة لحساب الموعد',
+                                'Mark progress to estimate',
+                                'اندازے کے لیے نشان لگائیں',
+                              ),
+                              style: TextStyle(
+                                color: theme.secondaryTextColor,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               _DecoratedGreenProgressBar(
@@ -447,6 +556,78 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                     theme: theme,
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              // Estimated Thawab (Hasanat = Letters Read × 10)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2B8A62).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF2B8A62).withValues(alpha: 0.45),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Color(0xFF2B8A62),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          tr(
+                            'الثواب التقديري (١٠ حسنات/حرف):',
+                            'Est. Thawab (10 Hasanat/letter):',
+                            'متوقع ثواب (١٠ نیکیاں فی حرف):',
+                          ),
+                          style: TextStyle(
+                            color: theme.glyphColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          tr(
+                            '${_formatGroupedNumber(liveReport.estimatedHasanat)} حسنة',
+                            '${_formatGroupedNumber(liveReport.estimatedHasanat)} Hasanat',
+                            '${_formatGroupedNumber(liveReport.estimatedHasanat)} نیکیاں',
+                          ),
+                          style: const TextStyle(
+                            color: Color(0xFF2B8A62),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (_formatApproxHasanatWords(
+                          liveReport.estimatedHasanat,
+                        ).isNotEmpty)
+                          Text(
+                            _formatApproxHasanatWords(
+                              liveReport.estimatedHasanat,
+                            ),
+                            style: TextStyle(
+                              color: theme.secondaryTextColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -524,12 +705,26 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
-                        'وقت التسجيل: ${_formatDateTimeArabic(mark.recordedAt)}',
+                        tr(
+                          'تاريخ التسجيل:',
+                          'Recorded Date:',
+                          'تاریخِ اندراج:',
+                        ),
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatDateTimeArabic(mark.recordedAt),
                         style: TextStyle(
                           color: theme.secondaryTextColor,
                           fontSize: 12,
+                          height: 1.4,
                         ),
                       ),
                     ],
@@ -569,8 +764,14 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                       icon: const Icon(Icons.menu_book_rounded, size: 18),
                       label: Text(
                         mark == null
-                            ? tr('الذهاب لبداية الختمة', 'Go to Start of Khatma')
-                            : tr('مواصلة القراءة من العلامة', 'Continue from Mark'),
+                            ? tr(
+                                'الذهاب لبداية الختمة',
+                                'Go to Start of Khatma',
+                              )
+                            : tr(
+                                'مواصلة القراءة من العلامة',
+                                'Continue from Mark',
+                              ),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -593,8 +794,9 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                         ),
                       ),
                       onPressed: () async {
-                        await widget.controller
-                            .deleteCurrentKhatmaMark(khatma.id);
+                        await widget.controller.deleteCurrentKhatmaMark(
+                          khatma.id,
+                        );
                       },
                       icon: const Icon(Icons.undo_rounded, size: 18),
                       label: Text(
@@ -637,8 +839,8 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () async {
-                        final completed =
-                            await widget.controller.completeActiveKhatma();
+                        final completed = await widget.controller
+                            .completeActiveKhatma();
                         if (!context.mounted || completed == null) return;
                         await showKhatmaReportModal(
                           context,
@@ -692,7 +894,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                         content: Directionality(
                           textDirection: L10n.dir,
                           child: Text(
-                            tr('بدأت ${created.displayTitle} على بركة الله!', '${created.displayTitle} started!'),
+                            tr(
+                              'بدأت ${created.displayTitle} على بركة الله!',
+                              '${created.displayTitle} started!',
+                            ),
                             style: TextStyle(color: theme.hudText),
                           ),
                         ),
@@ -701,11 +906,11 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                 },
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                 label: Text(
-                  tr('بدء ختمة جديدة / استكمال ختمة من مصحف آخر', 'Start New / Import from Another Mushaf'),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                  tr(
+                    'بدء ختمة جديدة / استكمال ختمة من مصحف آخر',
+                    'Start New / Import from Another Mushaf',
                   ),
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -715,7 +920,10 @@ class _KhatmaSheetState extends State<KhatmaSheet>
         const SizedBox(height: 16),
         // 3. Progress History Log
         Text(
-          tr('سجل علامات التقدم (${ArabicUtils.toArabicDigits(khatma.logs.length)})', 'Progress Log (${khatma.logs.length})'),
+          tr(
+            'سجل علامات التقدم (${ArabicUtils.toArabicDigits(khatma.logs.length)})',
+            'Progress Log (${khatma.logs.length})',
+          ),
           style: TextStyle(
             color: theme.glyphColor,
             fontSize: 15,
@@ -732,10 +940,7 @@ class _KhatmaSheetState extends State<KhatmaSheet>
             ),
             child: Text(
               'سيظهر هنا السجل الزمني لكل آية تحددها أثناء تقدمك في الختمة.',
-              style: TextStyle(
-                color: theme.secondaryTextColor,
-                fontSize: 12.5,
-              ),
+              style: TextStyle(color: theme.secondaryTextColor, fontSize: 12.5),
             ),
           )
         else
@@ -751,8 +956,9 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                     : theme.ornamentFill,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isLatest ? theme.ornamentPrimary : theme.pageInnerBorder,
+                  color: isLatest
+                      ? theme.ornamentPrimary
+                      : theme.pageInnerBorder,
                 ),
               ),
               child: ListTile(
@@ -898,14 +1104,64 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                'البدء: ${_formatDateTimeArabic(report.startedAt)}\nالإتمام: ${_formatDateTimeArabic(report.completedAt)}',
-                style: TextStyle(
-                  color: theme.secondaryTextColor,
-                  fontSize: 12,
-                  height: 1.45,
-                ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tr('تاريخ البدء:', 'Start Date:', 'تاریخِ آغاز:'),
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatDateTimeArabic(report.startedAt),
+                          style: TextStyle(
+                            color: theme.glyphColor,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tr(
+                            'تاريخ الإتمام:',
+                            'Completion Date:',
+                            'تاریخِ تکمیل:',
+                          ),
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatDateTimeArabic(report.completedAt),
+                          style: TextStyle(
+                            color: theme.glyphColor,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               Row(
@@ -1152,6 +1408,97 @@ class _KhatmaReportSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
 
+                      // Estimated Thawab (Hasanat) Card
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF2B8A62,
+                          ).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFF2B8A62),
+                            width: 1.4,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.auto_awesome_rounded,
+                                      color: Color(0xFF2B8A62),
+                                      size: 21,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      tr(
+                                        'الثواب التقديري للختمة (الحسنات)',
+                                        'Estimated Khatma Thawab (Hasanat)',
+                                        'ختمہ کا متوقع ثواب (نیکیاں)',
+                                      ),
+                                      style: TextStyle(
+                                        color: theme.glyphColor,
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              tr(
+                                '${_formatGroupedNumber(report.estimatedHasanat)} حسنة',
+                                '${_formatGroupedNumber(report.estimatedHasanat)} Hasanat',
+                                '${_formatGroupedNumber(report.estimatedHasanat)} نیکیاں',
+                              ),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF2B8A62),
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            if (_formatApproxHasanatWords(
+                              report.estimatedHasanat,
+                            ).isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                '(${_formatApproxHasanatWords(report.estimatedHasanat)})',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF2B8A62),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              tr(
+                                'عدد الحروف المقروءة: ${_formatGroupedNumber(report.totalLettersRead)} حرف × ١٠ حسنات لكل حرف\n«مَنْ قَرَأَ حَرْفًا مِنْ كِتَابِ اللَّهِ فَلَهُ بِهِ حَسَنَةٌ، وَالْحَسَنَةُ بِعَشْرِ أَمْثَالِهَا» — والله يضاعف لمن يشاء',
+                                'Letters read: ${_formatGroupedNumber(report.totalLettersRead)} letters × 10 Hasanat per letter\n"Whoever recites a letter from the Book of Allah receives a good deed multiplied by ten" — and Allah multiplies for whom He wills',
+                                'پڑھے گئے حروف: ${_formatGroupedNumber(report.totalLettersRead)} حرف × ١٠ نیکیاں فی حرف\n«جو کتاب اللہ کا ایک حرف پڑھے اس کے لیے ایک نیکی ہے اور ہر نیکی دس گنا ہے» — اور اللہ جس کے لیے چاہتا ہے بڑھا دیتا ہے',
+                              ),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: theme.secondaryTextColor,
+                                fontSize: 11.5,
+                                height: 1.45,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Dates & Duration Grid
                       _ReportDetailRow(
                         icon: Icons.tag_rounded,
@@ -1172,18 +1519,40 @@ class _KhatmaReportSheet extends StatelessWidget {
                       ),
                       _ReportDetailRow(
                         icon: Icons.play_circle_outline_rounded,
-                        label: 'تاريخ ووقت البدء',
+                        label: tr('تاريخ البدء', 'Start Date', 'تاریخِ آغاز'),
                         value: _formatDateTimeArabic(report.startedAt),
                         theme: theme,
                       ),
                       _ReportDetailRow(
                         icon: Icons.check_circle_outline_rounded,
                         label: khatma.isCompleted
-                            ? 'تاريخ ووقت الإتمام'
-                            : 'آخر تحديث مسجل',
+                            ? tr(
+                                'تاريخ الإتمام',
+                                'Completion Date',
+                                'تاریخِ تکمیل',
+                              )
+                            : tr(
+                                'تاريخ آخر تحديث',
+                                'Last Updated Date',
+                                'آخری تازہ کاری',
+                              ),
                         value: _formatDateTimeArabic(report.completedAt),
                         theme: theme,
                       ),
+                      if (!khatma.isCompleted &&
+                          report.estimatedCompletionDate != null)
+                        _ReportDetailRow(
+                          icon: Icons.event_available_rounded,
+                          label: tr(
+                            'التاريخ المتوقع للإتمام',
+                            'Estimated Finish Date',
+                            'متوقع تاریخِ تکمیل',
+                          ),
+                          value: _formatDateTimeArabic(
+                            report.estimatedCompletionDate!,
+                          ),
+                          theme: theme,
+                        ),
 
                       const SizedBox(height: 14),
                       Text(
@@ -1283,8 +1652,9 @@ class _KhatmaReportSheet extends StatelessWidget {
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: theme.glyphColor,
                                 side: BorderSide(color: theme.ornamentPrimary),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1307,8 +1677,9 @@ class _KhatmaReportSheet extends StatelessWidget {
                                         textDirection: L10n.dir,
                                         child: Text(
                                           'تم نسخ تقرير الختمة إلى الحافظة',
-                                          style:
-                                              TextStyle(color: theme.hudText),
+                                          style: TextStyle(
+                                            color: theme.hudText,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1327,8 +1698,9 @@ class _KhatmaReportSheet extends StatelessWidget {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: theme.ornamentPrimary,
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1355,15 +1727,20 @@ class _KhatmaReportSheet extends StatelessWidget {
   }
 
   String _buildPlainTextReport(KhatmaReport r) {
+    final estLine = r.estimatedCompletionDate != null && !khatma.isCompleted
+        ? '\n• التاريخ المتوقع للإتمام:\n${_formatDateTimeArabic(r.estimatedCompletionDate!)}'
+        : '';
     return '''
 📖 تقرير الختمة القرآنية رقم ${ArabicUtils.toArabicDigits(r.serialNumber)}
 • المدة المستغرقة: ${_formatDetailedDuration(r.durationInDays, r.exactDuration, r.calendarDaysSpan)}
-• تاريخ ووقت البدء: ${_formatDateTimeArabic(r.startedAt)}
-• تاريخ ووقت الإتمام: ${_formatDateTimeArabic(r.completedAt)}
+• تاريخ البدء:
+${_formatDateTimeArabic(r.startedAt)}
+• ${khatma.isCompleted ? 'تاريخ الإتمام' : 'تاريخ آخر تحديث'}:
+${_formatDateTimeArabic(r.completedAt)}$estLine
+• الثواب التقديري (١٠ حسنات لكل حرف): ${_formatGroupedNumber(r.estimatedHasanat)} حسنة — ${_formatApproxHasanatWords(r.estimatedHasanat)} (${_formatGroupedNumber(r.totalLettersRead)} حرف)
 • معدل الآيات يومياً: ${ArabicUtils.toArabicDigits(r.averageAyahsPerDay.toStringAsFixed(1))} آية/يوم
 • معدل الصفحات يومياً: ${ArabicUtils.toArabicDigits(r.averagePagesPerDay.toStringAsFixed(1))} صفحة/يوم
 • معدل الأجزاء يومياً: ${ArabicUtils.toArabicDigits(r.averageJuzPerDay.toStringAsFixed(2))} جزء/يوم
-• الوقت المعتاد للقراءة: ${r.usualReadingSlot.arabicName} (حوالي ${_formatHourArabic(r.peakReadingHour)})
 ''';
   }
 }
@@ -1475,14 +1852,7 @@ class _MiniStatBox extends StatelessWidget {
 }
 
 String _formatDateTimeArabic(DateTime dt) {
-  final y = ArabicUtils.toArabicDigits(dt.year);
-  final m = ArabicUtils.toArabicDigits(dt.month.toString().padLeft(2, '0'));
-  final d = ArabicUtils.toArabicDigits(dt.day.toString().padLeft(2, '0'));
-  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-  final h = ArabicUtils.toArabicDigits(hour12.toString().padLeft(2, '0'));
-  final min = ArabicUtils.toArabicDigits(dt.minute.toString().padLeft(2, '0'));
-  final amPm = dt.hour < 12 ? 'ص' : 'م';
-  return '$y/$m/$d — $h:$min $amPm';
+  return MushafDateUtils.formatHijriAboveGregorian(dt);
 }
 
 String _formatHourArabic(int hour24) {
@@ -1492,10 +1862,12 @@ String _formatHourArabic(int hour24) {
 }
 
 String _formatDaysLabel(double exactDays, int calendarDays) {
-  if (exactDays < 1.0) {
-    return '${ArabicUtils.toArabicDigits(calendarDays)} يوم';
-  }
-  return '${ArabicUtils.toArabicDigits(exactDays.toStringAsFixed(1))} يوم';
+  final days = calendarDays < 1 ? 1 : calendarDays;
+  return tr(
+    '${ArabicUtils.toArabicDigits(days)} يوم',
+    '$days ${days == 1 ? 'day' : 'days'}',
+    '${ArabicUtils.toArabicDigits(days)} دن',
+  );
 }
 
 String _formatDetailedDuration(
@@ -1503,24 +1875,118 @@ String _formatDetailedDuration(
   Duration duration,
   int calendarDays,
 ) {
-  final wholeDays = duration.inDays;
-  final remHours = duration.inHours % 24;
-  final remMins = duration.inMinutes % 60;
-
-  if (wholeDays == 0) {
-    if (remHours == 0) {
-      return 'يوم واحد (${ArabicUtils.toArabicDigits(remMins)} دقيقة)';
-    }
-    return 'يوم واحد (${ArabicUtils.toArabicDigits(remHours)} س و ${ArabicUtils.toArabicDigits(remMins)} د)';
+  final days = calendarDays < 1 ? 1 : calendarDays;
+  if (days <= 1) {
+    return tr('يوم واحد', '1 day', 'ایک دن');
   }
-  return '${ArabicUtils.toArabicDigits(exactDays.toStringAsFixed(1))} يوم (${ArabicUtils.toArabicDigits(wholeDays)} يوم و ${ArabicUtils.toArabicDigits(remHours)} ساعة)';
+  return tr(
+    '${ArabicUtils.toArabicDigits(days)} يوم',
+    '$days days',
+    '${ArabicUtils.toArabicDigits(days)} دن',
+  );
 }
 
 String _formatDateOnlyArabic(DateTime dt) {
-  final y = ArabicUtils.toArabicDigits(dt.year);
-  final m = ArabicUtils.toArabicDigits(dt.month.toString().padLeft(2, '0'));
-  final d = ArabicUtils.toArabicDigits(dt.day.toString().padLeft(2, '0'));
-  return '$y/$m/$d';
+  return MushafDateUtils.formatHijriAboveGregorian(dt);
+}
+
+/// Formats an integer with thousands separators in the active language digits.
+String _formatGroupedNumber(int value) {
+  final raw = value.toString();
+  final buf = StringBuffer();
+  for (int i = 0; i < raw.length; i++) {
+    if (i > 0 && (raw.length - i) % 3 == 0) {
+      buf.write(',');
+    }
+    buf.write(raw[i]);
+  }
+  return ArabicUtils.toArabicDigits(buf.toString());
+}
+
+/// Returns a human-readable approximate phrase for [hasanat], such as:
+/// - 2,300,234 -> "More than 2 million Hasanat" / "أكثر من مليوني حسنة"
+/// - 2,600,300 -> "More than two and a half million Hasanat" / "أكثر من مليونين ونصف حسنة"
+/// - 3,242,900 -> "More than 3 million Hasanat" / "أكثر من ثلاثة ملايين حسنة"
+String _formatApproxHasanatWords(int hasanat) {
+  if (hasanat < 1000) return '';
+
+  // Millions & Half-Millions (500,000+)
+  if (hasanat >= 500000) {
+    final int halfMillionSteps =
+        hasanat ~/
+        500000; // 1 = 0.5M, 2 = 1.0M, 3 = 1.5M, 4 = 2.0M, 5 = 2.5M, 6 = 3.0M
+    return switch (halfMillionSteps) {
+      1 => tr(
+        'أكثر من نصف مليون حسنة',
+        'More than half a million Hasanat',
+        'آدھے ملین سے زیادہ نیکیاں',
+      ),
+      2 => tr(
+        'أكثر من مليون حسنة',
+        'More than 1 million Hasanat',
+        'ایک ملین سے زیادہ نیکیاں',
+      ),
+      3 => tr(
+        'أكثر من مليون ونصف حسنة',
+        'More than one and a half million Hasanat',
+        'ڈیڑھ ملین سے زیادہ نیکیاں',
+      ),
+      4 => tr(
+        'أكثر من مليوني حسنة',
+        'More than 2 million Hasanat',
+        'دو ملین سے زیادہ نیکیاں',
+      ),
+      5 => tr(
+        'أكثر من مليونين ونصف حسنة',
+        'More than two and a half million Hasanat',
+        'ڈھائی ملین سے زیادہ نیکیاں',
+      ),
+      6 => tr(
+        'أكثر من ثلاثة ملايين حسنة',
+        'More than 3 million Hasanat',
+        'تین ملین سے زیادہ نیکیاں',
+      ),
+      _ => () {
+        final int wholeMillions = halfMillionSteps ~/ 2;
+        final bool hasHalf = halfMillionSteps.isOdd;
+        final String mDigits = ArabicUtils.toArabicDigits(wholeMillions);
+        if (hasHalf) {
+          return tr(
+            'أكثر من $mDigits مليون ونصف حسنة',
+            'More than $wholeMillions and a half million Hasanat',
+            '$mDigits اور آدھے ملین سے زیادہ نیکیاں',
+          );
+        }
+        return tr(
+          'أكثر من $mDigits ملايين حسنة',
+          'More than $wholeMillions million Hasanat',
+          '$mDigits ملین سے زیادہ نیکیاں',
+        );
+      }(),
+    };
+  }
+
+  // Hundreds of thousands (100,000 .. 499,999)
+  if (hasanat >= 100000) {
+    final int hundredThousands = (hasanat ~/ 100000) * 100;
+    final String kDigits = ArabicUtils.toArabicDigits(hundredThousands);
+    return tr(
+      'أكثر من $kDigits ألف حسنة',
+      'More than $hundredThousands thousand Hasanat',
+      '$kDigits ہزار سے زیادہ نیکیاں',
+    );
+  }
+
+  // Tens of thousands / thousands (1,000 .. 99,999)
+  final int thousands = hasanat >= 10000
+      ? (hasanat ~/ 10000) * 10
+      : (hasanat ~/ 1000);
+  final String kDigits = ArabicUtils.toArabicDigits(thousands);
+  return tr(
+    'أكثر من $kDigits ألف حسنة',
+    'More than $thousands thousand Hasanat',
+    '$kDigits ہزار سے زیادہ نیکیاں',
+  );
 }
 
 class _StartupKhatmaPromptDialog extends StatelessWidget {
@@ -1594,7 +2060,10 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                tr('اختر كيف تودّ المتابعة في هذه الجلسة:', 'How would you like to continue this session?'),
+                tr(
+                  'اختر كيف تودّ المتابعة في هذه الجلسة:',
+                  'How would you like to continue this session?',
+                ),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: theme.secondaryTextColor,
@@ -1608,7 +2077,10 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               if (activeKhatma != null) ...[
                 _StartupOptionCard(
                   icon: Icons.flag_rounded,
-                  title: tr('مواصلة الختمة الحالية (${activeKhatma.displayTitle})', 'Continue ${activeKhatma.displayTitle}'),
+                  title: tr(
+                    'مواصلة الختمة الحالية (${activeKhatma.displayTitle})',
+                    'Continue ${activeKhatma.displayTitle}',
+                  ),
                   subtitle: mark != null
                       ? 'الموضع الحالي: سورة ${mark.surahNameArabic} • الآية ${ArabicUtils.toArabicDigits(mark.ayahNumber)} (ص ${ArabicUtils.toArabicDigits(mark.pageNumber)})'
                       : 'البداية: سورة الفاتحة • الآية ١ (ص ١)',
@@ -1629,8 +2101,10 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               _StartupOptionCard(
                 icon: Icons.add_task_rounded,
                 title: tr('بدء ختمة جديدة', 'Start a New Khatma'),
-                subtitle:
-                    tr('بدء ختمة من أول المصحف، أو استكمال ختمة بدأتها في مصحف ورقي أو جهاز آخر', 'Start from Al-Fatihah, or continue a Khatma from a physical Mushaf or another device'),
+                subtitle: tr(
+                  'بدء ختمة من أول المصحف، أو استكمال ختمة بدأتها في مصحف ورقي أو جهاز آخر',
+                  'Start from Al-Fatihah, or continue a Khatma from a physical Mushaf or another device',
+                ),
                 isPrimary: activeKhatma == null,
                 theme: theme,
                 onTap: () async {
@@ -1649,7 +2123,10 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
                         content: Directionality(
                           textDirection: L10n.dir,
                           child: Text(
-                            tr('بدأت ${created.displayTitle} على بركة الله!', '${created.displayTitle} started!'),
+                            tr(
+                              'بدأت ${created.displayTitle} على بركة الله!',
+                              '${created.displayTitle} started!',
+                            ),
                             style: TextStyle(color: theme.hudText),
                           ),
                         ),
@@ -1663,8 +2140,10 @@ class _StartupKhatmaPromptDialog extends StatelessWidget {
               _StartupOptionCard(
                 icon: Icons.menu_book_rounded,
                 title: tr('قراءة حرة', 'Free Reading'),
-                subtitle:
-                    tr('تصفح المصحف والقراءة الحرة دون الارتباط بعلامة الختمة (ص ${ArabicUtils.toArabicDigits(controller.currentPage)})', 'Browse and read freely without updating Khatma mark (p. ${controller.currentPage})'),
+                subtitle: tr(
+                  'تصفح المصحف والقراءة الحرة دون الارتباط بعلامة الختمة (ص ${ArabicUtils.toArabicDigits(controller.currentPage)})',
+                  'Browse and read freely without updating Khatma mark (p. ${controller.currentPage})',
+                ),
                 isPrimary: false,
                 theme: theme,
                 onTap: () {
@@ -1719,8 +2198,7 @@ class _StartupOptionCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color:
-                    isPrimary ? theme.ornamentPrimary : theme.pageBackground,
+                color: isPrimary ? theme.ornamentPrimary : theme.pageBackground,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: isPrimary
@@ -1778,9 +2256,7 @@ class _StartupOptionCard extends StatelessWidget {
 class _StartNewKhatmaDialog extends StatefulWidget {
   final MushafController controller;
 
-  const _StartNewKhatmaDialog({
-    required this.controller,
-  });
+  const _StartNewKhatmaDialog({required this.controller});
 
   @override
   State<_StartNewKhatmaDialog> createState() => _StartNewKhatmaDialogState();
@@ -1865,10 +2341,9 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
     if (ayahRecord != null) {
       await widget.controller.goToPage(
         ayahRecord.pageNumber,
-        highlightVerseKey:
-            (_selectedSurahId != 1 || _selectedAyahNumber != 1)
-                ? ayahRecord.verseKey
-                : null,
+        highlightVerseKey: (_selectedSurahId != 1 || _selectedAyahNumber != 1)
+            ? ayahRecord.verseKey
+            : null,
       );
     } else {
       await widget.controller.goToPage(1);
@@ -1931,7 +2406,10 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        tr('بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}', 'Start Khatma #$nextSerial'),
+                        tr(
+                          'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                          'Start Khatma #$nextSerial',
+                        ),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 18,
@@ -1970,7 +2448,10 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        tr('يمكنك البدء من أول المصحف (سورة الفاتحة آية ١) بتاريخ اليوم، أو استكمال ختمة بدأتها في الماضي على مصحف ورقي أو جهاز آخر عبر اختيار تاريخ سابق وتحديد السورة والآية التي وصلت إليها.', 'You can start from Surah Al-Fatihah (1:1) today, or continue a Khatma you started in the past on a physical Mushaf or another device by picking a past start date and the Surah & Ayah you reached.'),
+                        tr(
+                          'يمكنك البدء من أول المصحف (سورة الفاتحة آية ١) بتاريخ اليوم، أو استكمال ختمة بدأتها في الماضي على مصحف ورقي أو جهاز آخر عبر اختيار تاريخ سابق وتحديد السورة والآية التي وصلت إليها.',
+                          'You can start from Surah Al-Fatihah (1:1) today, or continue a Khatma you started in the past on a physical Mushaf or another device by picking a past start date and the Surah & Ayah you reached.',
+                        ),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 12.5,
@@ -1997,7 +2478,10 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        tr('بداية الختمة (السورة والآية)', 'Khatma Starting Verse'),
+                        tr(
+                          'بداية الختمة (السورة والآية)',
+                          'Khatma Starting Verse',
+                        ),
                         style: TextStyle(
                           color: theme.glyphColor,
                           fontSize: 14.5,
@@ -2082,20 +2566,25 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                                       Icons.keyboard_arrow_down_rounded,
                                       color: theme.ornamentPrimary,
                                     ),
-                                    items: surahs.map((s) {
-                                      return DropdownMenuItem<int>(
-                                        value: s.id,
-                                        child: Text(
-                                          tr('${ArabicUtils.toArabicDigits(s.id)}. سورة ${s.nameArabic}', '${s.id}. ${s.nameEnglish}'),
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: theme.glyphColor,
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(growable: false),
+                                    items: surahs
+                                        .map((s) {
+                                          return DropdownMenuItem<int>(
+                                            value: s.id,
+                                            child: Text(
+                                              tr(
+                                                '${ArabicUtils.toArabicDigits(s.id)}. سورة ${s.nameArabic}',
+                                                '${s.id}. ${s.nameEnglish}',
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: theme.glyphColor,
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          );
+                                        })
+                                        .toList(growable: false),
                                     onChanged: (newSurahId) {
                                       if (newSurahId == null) return;
                                       setState(() {
@@ -2156,7 +2645,10 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                                         return DropdownMenuItem<int>(
                                           value: ayahNum,
                                           child: Text(
-                                            tr('الآية ${ArabicUtils.toArabicDigits(ayahNum)}', 'Ayah $ayahNum'),
+                                            tr(
+                                              'الآية ${ArabicUtils.toArabicDigits(ayahNum)}',
+                                              'Ayah $ayahNum',
+                                            ),
                                             style: TextStyle(
                                               color: theme.glyphColor,
                                               fontSize: 13.5,
@@ -2264,13 +2756,23 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                         children: [
                           Text(
                             isToday
-                                ? 'اليوم (${_formatDateOnlyArabic(_selectedStartDate)})'
+                                ? tr('اليوم', 'Today', 'آج')
                                 : isYesterday
-                                    ? 'أمس (${_formatDateOnlyArabic(_selectedStartDate)})'
-                                    : 'تاريخ سابق (${_formatDateOnlyArabic(_selectedStartDate)})',
+                                ? tr('أمس', 'Yesterday', 'کل')
+                                : tr('تاريخ سابق', 'Past Date', 'سابقہ تاریخ'),
+                            style: TextStyle(
+                              color: theme.ornamentPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _formatDateOnlyArabic(_selectedStartDate),
                             style: TextStyle(
                               color: theme.glyphColor,
-                              fontSize: 14.5,
+                              fontSize: 13.5,
+                              height: 1.4,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -2414,7 +2916,10 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
                       onPressed: _isSubmitting ? null : _confirmStartKhatma,
                       icon: const Icon(Icons.play_arrow_rounded, size: 22),
                       label: Text(
-                        tr('بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}', 'Start Khatma #$nextSerial'),
+                        tr(
+                          'بدء الختمة رقم ${ArabicUtils.toArabicDigits(nextSerial)}',
+                          'Start Khatma #$nextSerial',
+                        ),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -2431,7 +2936,6 @@ class _StartNewKhatmaDialogState extends State<_StartNewKhatmaDialog> {
     );
   }
 }
-
 
 class _DecoratedGreenProgressBar extends StatelessWidget {
   final double progress;
@@ -2486,7 +2990,9 @@ class _DecoratedGreenProgressBar extends StatelessWidget {
                         bottom: 3,
                         child: Container(
                           width: 1,
-                          color: theme.secondaryTextColor.withValues(alpha: 0.25),
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.25,
+                          ),
                         ),
                       ),
                     // Green gradient fill with diagonal stripe decoration

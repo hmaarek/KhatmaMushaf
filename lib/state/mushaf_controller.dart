@@ -10,6 +10,7 @@ import '../models/mushaf_models.dart';
 import '../services/database_service.dart';
 import '../services/font_loader_service.dart';
 import '../services/khatma_service.dart';
+import '../services/mushaf_system_service.dart';
 import '../services/quran_audio_service.dart';
 import '../services/smart_search_service.dart';
 import '../theme/mushaf_theme.dart';
@@ -17,6 +18,52 @@ import '../utils/arabic_utils.dart';
 
 /// Quran script style: Madinah Uthmani (15-line QPC) or Indo-Pak Nastaleeq.
 enum MushafScript { uthmani, indoPak }
+
+/// Controls how pages are navigated in the Mushaf reader.
+enum MushafScrollMode {
+  sideFlip(icon: Icons.swipe_rounded),
+  verticalContinuous(icon: Icons.swap_vert_rounded),
+  verticalSnap(icon: Icons.vertical_align_center_rounded);
+
+  final IconData icon;
+  const MushafScrollMode({required this.icon});
+
+  String get title => switch (this) {
+    MushafScrollMode.sideFlip => tr(
+      'قلب الصفحات جانبياً',
+      'Side flip',
+      'صفحات دائیں بائیں پلٹنا',
+    ),
+    MushafScrollMode.verticalContinuous => tr(
+      'تمرير عمودي مستمر',
+      'Continuous vertical scroll',
+      'مسلسل عمودی اسکرول',
+    ),
+    MushafScrollMode.verticalSnap => tr(
+      'تمرير عمودي مع محاذاة الحواف',
+      'Vertical Scroll with snap to edge',
+      'کنارے سے جڑنے والا عمودی اسکرول',
+    ),
+  };
+
+  String get subtitle => switch (this) {
+    MushafScrollMode.sideFlip => tr(
+      'تصفح المصحف بقلب الصفحات من اليمين لليسار (الافتراضي)',
+      'Flip pages horizontally from side to side (default)',
+      'صفحات کو دائیں سے بائیں پلٹیں (ڈیفالٹ)',
+    ),
+    MushafScrollMode.verticalContinuous => tr(
+      'تمرير حر وسلس للأعلى والأسفل عبر صفحات المصحف',
+      'Free, smooth up/down scrolling across Mushaf pages',
+      'صفحات کے درمیان اوپر نیچے آزاد اور ہموار اسکرولنگ',
+    ),
+    MushafScrollMode.verticalSnap => tr(
+      'تمرير عمودي سلس يستقر تلقائياً عند حافة الصفحة',
+      'Smooth vertical scrolling that snaps cleanly to page edges',
+      'ہموار عمودی اسکرولنگ جو خودکار طور پر صفحے کے کنارے پر رکتی ہے',
+    ),
+  };
+}
 
 /// Controls how the 15-line Uthmani Mushaf page is sized/zoomed.
 /// All modes strictly preserve the 15-line Madinah Mushaf page & line breaks.
@@ -117,6 +164,8 @@ class MushafController extends ChangeNotifier {
   static const String _prefSavedHighlightIndex =
       'mushaf_saved_ayah_highlight_index';
   static const String _prefVerticalScroll = 'mushaf_vertical_scroll';
+  static const String _prefScrollMode = 'mushaf_scroll_mode';
+  static const String _prefSnapHaptic = 'mushaf_snap_haptic';
   static const String _prefAllowLandscape = 'mushaf_allow_landscape';
 
   /// Selectable highlight colors for saved (bookmarked) ayahs.
@@ -156,8 +205,10 @@ class MushafController extends ChangeNotifier {
   QuranReciter _selectedReciter = QuranReciter.husaryMurattal;
   bool _isHudVisible = false;
   String? _selectedVerseKey;
-  bool _verticalScroll = false;
+  MushafScrollMode _scrollMode = MushafScrollMode.sideFlip;
+  bool _snapHapticEnabled = true;
   bool _allowLandscape = true;
+  DateTime? _lastSnapHapticAt;
 
   /// Registered by the reader screen while the continuous vertical-scroll
   /// list is active, so [goToPage] can scroll it to a target page.
@@ -183,8 +234,17 @@ class MushafController extends ChangeNotifier {
   bool get autoPlayAyahAfterWord => _autoPlayAyahAfterWord;
   bool get askKhatmaOnStartup => _askKhatmaOnStartup;
 
-  /// Continuous smooth vertical scrolling instead of side page-flipping.
-  bool get verticalScroll => _verticalScroll;
+  /// Active page scrolling mode (Side flip, Continuous vertical, or Vertical snap).
+  MushafScrollMode get scrollMode => _scrollMode;
+
+  /// True when either vertical scrolling mode (continuous or snap-to-edge) is active.
+  bool get verticalScroll => _scrollMode != MushafScrollMode.sideFlip;
+
+  /// True when vertical scrolling with snap-to-edge is active.
+  bool get verticalSnap => _scrollMode == MushafScrollMode.verticalSnap;
+
+  /// True when the subtle haptic tick on page snap-to-edge is enabled.
+  bool get snapHapticEnabled => _snapHapticEnabled;
 
   /// Rotate to a landscape (horizontal) layout when the phone is turned.
   bool get allowLandscape => _allowLandscape;
@@ -314,14 +374,26 @@ class MushafController extends ChangeNotifier {
     _savedHighlightIndex = (_prefs?.getInt(_prefSavedHighlightIndex) ?? 0)
         .clamp(0, savedHighlightPalette.length - 1);
     _selectedReciter = QuranReciter.values[savedReciterIdx];
-    _verticalScroll = _prefs?.getBool(_prefVerticalScroll) ?? false;
+    final savedScrollModeIdx = _prefs?.getInt(_prefScrollMode);
+    if (savedScrollModeIdx != null) {
+      _scrollMode =
+          MushafScrollMode.values[savedScrollModeIdx.clamp(
+            0,
+            MushafScrollMode.values.length - 1,
+          )];
+    } else if (_prefs?.getBool(_prefVerticalScroll) ?? false) {
+      _scrollMode = MushafScrollMode.verticalSnap;
+    } else {
+      _scrollMode = MushafScrollMode.sideFlip;
+    }
     _allowLandscape = _prefs?.getBool(_prefAllowLandscape) ?? true;
+    _snapHapticEnabled = _prefs?.getBool(_prefSnapHaptic) ?? true;
     _pageController = PageController(initialPage: _currentPage - 1);
 
     await _applyWakelock(_keepScreenAwake);
     await _applyOrientations(_allowLandscape);
 
-    // Load index tables, bookmarks, khatmas, and initial page data + QPC font in parallel
+    // Load index tables, bookmarks, khatmas, letter counts, and initial page data + QPC font in parallel
     final results = await Future.wait<Object?>([
       _dbService.getAllSurahs(),
       _dbService.getAllJuzs(),
@@ -329,6 +401,7 @@ class MushafController extends ChangeNotifier {
       _khatmaService.getAllKhatmas(),
       _dbService.preloadPages(_currentPage, radius: 1),
       _fontLoader.preloadWindow(_currentPage, radius: 1),
+      _dbService.ensureLetterCountsLoaded(),
     ]);
 
     _surahs = results[0] as List<SurahInfo>;
@@ -338,6 +411,8 @@ class MushafController extends ChangeNotifier {
 
     _isInitialized = true;
     notifyListeners();
+
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
 
     // Preload slightly wider window and smart search index in background
     unawaited(_dbService.preloadPages(_currentPage, radius: 2));
@@ -376,11 +451,12 @@ class MushafController extends ChangeNotifier {
     }
   }
 
-  void setVerticalScroll(bool value) {
-    if (_verticalScroll == value) return;
-    _verticalScroll = value;
-    _prefs?.setBool(_prefVerticalScroll, value);
-    if (!value) {
+  void setScrollMode(MushafScrollMode mode) {
+    if (_scrollMode == mode) return;
+    _scrollMode = mode;
+    _prefs?.setInt(_prefScrollMode, mode.index);
+    _prefs?.setBool(_prefVerticalScroll, mode != MushafScrollMode.sideFlip);
+    if (mode == MushafScrollMode.sideFlip) {
       // The PageView will be rebuilt: recreate its controller so it opens
       // at the page the user reached while scrolling vertically.
       final old = _pageController;
@@ -390,12 +466,53 @@ class MushafController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setVerticalScroll(bool value) {
+    setScrollMode(
+      value ? MushafScrollMode.verticalContinuous : MushafScrollMode.sideFlip,
+    );
+  }
+
+  /// Opens the Help YouTube video in the external browser or YouTube app.
+  Future<bool> openHelpVideo() {
+    return MushafSystemService.instance.openExternalUrl(
+      MushafSystemService.helpYoutubeUrl,
+    );
+  }
+
+  /// Schedules a 5-second test preview of the 24-hour Khatma reminder notification.
+  Future<bool> triggerTestKhatmaReminder() {
+    return MushafSystemService.instance.triggerTestKhatmaReminder();
+  }
+
   void setAllowLandscape(bool value) {
     if (_allowLandscape == value) return;
     _allowLandscape = value;
     _prefs?.setBool(_prefAllowLandscape, value);
     unawaited(_applyOrientations(value));
     notifyListeners();
+  }
+
+  void setSnapHapticEnabled(bool value) {
+    if (_snapHapticEnabled == value) return;
+    _snapHapticEnabled = value;
+    _prefs?.setBool(_prefSnapHaptic, value);
+    if (value) {
+      unawaited(HapticFeedback.selectionClick());
+    }
+    notifyListeners();
+  }
+
+  /// Fires a very gentle haptic tick (selectionClick) when a page snaps into
+  /// place, if [snapHapticEnabled] is true.
+  void triggerSnapHaptic() {
+    if (!_snapHapticEnabled) return;
+    final now = DateTime.now();
+    if (_lastSnapHapticAt != null &&
+        now.difference(_lastSnapHapticAt!).inMilliseconds < 250) {
+      return;
+    }
+    _lastSnapHapticAt = now;
+    unawaited(HapticFeedback.selectionClick());
   }
 
   void _updateBookmarksCache(List<BookmarkItem> items) {
@@ -468,7 +585,7 @@ class MushafController extends ChangeNotifier {
     }
     _prefs?.setInt(_prefLastReadPage, _currentPage);
 
-    if (_verticalScroll) {
+    if (verticalScroll) {
       verticalJumpHandler?.call(clamped);
     } else if (_pageController != null && _pageController!.hasClients) {
       _pageController!.jumpToPage(clamped - 1);
@@ -576,6 +693,7 @@ class MushafController extends ChangeNotifier {
       _mushafScript = MushafScript.indoPak;
       _prefs?.setString(_prefMushafScript, 'indopak');
     }
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
   }
 
@@ -701,6 +819,7 @@ class MushafController extends ChangeNotifier {
       startedAt: startedAt,
     );
     _khatmas = await _khatmaService.getAllKhatmas();
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
     return created;
   }
@@ -722,6 +841,7 @@ class MushafController extends ChangeNotifier {
     );
     _khatmas = await _khatmaService.getAllKhatmas();
     _selectedVerseKey = null;
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
     return result;
   }
@@ -735,6 +855,7 @@ class MushafController extends ChangeNotifier {
     final updated = await _khatmaService.deleteCurrentMark(targetId);
     _khatmas = await _khatmaService.getAllKhatmas();
     _selectedVerseKey = null;
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
     return updated;
   }
@@ -743,6 +864,7 @@ class MushafController extends ChangeNotifier {
   Future<void> deleteKhatmaLogEntry(int khatmaId, int logId) async {
     await _khatmaService.deleteLogEntry(khatmaId, logId);
     _khatmas = await _khatmaService.getAllKhatmas();
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
   }
 
@@ -760,6 +882,7 @@ class MushafController extends ChangeNotifier {
     final completed = await _khatmaService.completeKhatmaAtEnd(current.id);
     _khatmas = await _khatmaService.getAllKhatmas();
     _selectedVerseKey = null;
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
     return completed;
   }
@@ -768,6 +891,7 @@ class MushafController extends ChangeNotifier {
   Future<void> deleteKhatma(int khatmaId) async {
     await _khatmaService.deleteKhatma(khatmaId);
     _khatmas = await _khatmaService.getAllKhatmas();
+    unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
     notifyListeners();
   }
 
@@ -778,6 +902,18 @@ class MushafController extends ChangeNotifier {
 
   Future<AyahRecord?> getAyahRecord(String verseKey) {
     return _dbService.getAyahByVerseKey(verseKey);
+  }
+
+  Future<List<AyahRecord>> getAyahRangeInSurah({
+    required int surahId,
+    required int startAyahNumber,
+    required int count,
+  }) {
+    return _dbService.getAyahRangeInSurah(
+      surahId: surahId,
+      startAyahNumber: startAyahNumber,
+      count: count,
+    );
   }
 
   Future<List<AyahRecord>> searchAyahs(String query) {

@@ -235,6 +235,10 @@ class KhatmaReport {
   final ReadingTimeSlot usualReadingSlot;
   final int peakReadingHour; // 0..23
   final Map<ReadingTimeSlot, int> slotDistribution;
+  final DateTime? estimatedCompletionDate;
+  final int? estimatedRemainingDays;
+  final int totalLettersRead;
+  final int estimatedHasanat;
 
   const KhatmaReport({
     required this.khatmaId,
@@ -251,5 +255,9 @@ class KhatmaReport {
     required this.usualReadingSlot,
     required this.peakReadingHour,
     required this.slotDistribution,
+    this.estimatedCompletionDate,
+    this.estimatedRemainingDays,
+    this.totalLettersRead = 0,
+    this.estimatedHasanat = 0,
   });
 }

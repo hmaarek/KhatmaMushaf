@@ -14,6 +14,7 @@ class DatabaseService {
   final Map<int, MushafPageData> _pageCache = <int, MushafPageData>{};
   List<SurahInfo>? _surahsCache;
   List<JuzInfo>? _juzsCache;
+  List<int>? _cumulativeLettersByAyah;
 
   Future<Database> get database async {
     if (_db != null) return _db!;
@@ -111,6 +112,54 @@ class DatabaseService {
     return _juzsCache!;
   }
 
+  /// Preloads the cumulative Arabic letter count for each of the 6,236 ayahs
+  /// so Khatma Thawab (Hasanat = letters * 10) can be calculated synchronously.
+  Future<void> ensureLetterCountsLoaded() async {
+    if (_cumulativeLettersByAyah != null) return;
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT id,
+             length(replace(
+               CASE
+                 WHEN instr(text_clean, ' | ') > 0
+                 THEN substr(text_clean, 1, instr(text_clean, ' | ') - 1)
+                 ELSE text_clean
+               END,
+               ' ', ''
+             )) AS letter_count
+      FROM ayahs
+      ORDER BY id ASC
+    ''');
+    final cumulative = List<int>.filled(6237, 0);
+    int running = 0;
+    for (final row in rows) {
+      final id = (row['id'] as int?) ?? 0;
+      final count = (row['letter_count'] as int?) ?? 0;
+      running += count;
+      if (id >= 1 && id <= 6236) {
+        cumulative[id] = running;
+      }
+    }
+    for (int i = 1; i <= 6236; i++) {
+      if (cumulative[i] < cumulative[i - 1]) {
+        cumulative[i] = cumulative[i - 1];
+      }
+    }
+    _cumulativeLettersByAyah = cumulative;
+  }
+
+  /// Returns the cumulative number of Quranic Arabic letters from Ayah 1 up to
+  /// [ayahGlobalId] (1..6236). Total letters across the Quran = 324,290.
+  int getCumulativeLettersUpToAyah(int ayahGlobalId) {
+    if (ayahGlobalId <= 0) return 0;
+    final table = _cumulativeLettersByAyah;
+    if (table != null) {
+      final idx = ayahGlobalId.clamp(0, table.length - 1);
+      return table[idx];
+    }
+    return ((ayahGlobalId.clamp(0, 6236) / 6236.0) * 324290).round();
+  }
+
   /// Returns cached [MushafPageData] if already loaded in memory.
   MushafPageData? getCachedPageData(int pageNumber) => _pageCache[pageNumber];
 
@@ -152,20 +201,22 @@ class DatabaseService {
       (wordsByLine[lineNum] ??= <LineWord>[]).add(LineWord.fromMap(wRow));
     }
 
-    final lines = lineRows.map((row) {
-      final lineNum = row['line_number'] as int;
-      return MushafPageLine(
-        pageNumber: clamped,
-        lineNumber: lineNum,
-        lineType: row['line_type'] as String,
-        surahId: row['surah_id'] as int?,
-        headerText: row['header_text'] as String?,
-        qpcV1Text: row['qpc_v1_text'] as String?,
-        uthmaniText: row['uthmani_text'] as String?,
-        verseRange: row['verse_range'] as String?,
-        words: wordsByLine[lineNum] ?? const <LineWord>[],
-      );
-    }).toList(growable: false);
+    final lines = lineRows
+        .map((row) {
+          final lineNum = row['line_number'] as int;
+          return MushafPageLine(
+            pageNumber: clamped,
+            lineNumber: lineNum,
+            lineType: row['line_type'] as String,
+            surahId: row['surah_id'] as int?,
+            headerText: row['header_text'] as String?,
+            qpcV1Text: row['qpc_v1_text'] as String?,
+            uthmaniText: row['uthmani_text'] as String?,
+            verseRange: row['verse_range'] as String?,
+            words: wordsByLine[lineNum] ?? const <LineWord>[],
+          );
+        })
+        .toList(growable: false);
 
     final pageData = MushafPageData(info: pageInfo, lines: lines);
 
@@ -214,6 +265,28 @@ class DatabaseService {
     return AyahRecord.fromMap(rows.first);
   }
 
+  /// Fetches a contiguous range of [AyahRecord]s in [surahId] starting at
+  /// [startAyahNumber] for [count] ayahs (clamped to the end of the Surah).
+  Future<List<AyahRecord>> getAyahRangeInSurah({
+    required int surahId,
+    required int startAyahNumber,
+    required int count,
+  }) async {
+    final db = await database;
+    final endAyahNumber = startAyahNumber + (count < 1 ? 0 : count - 1);
+    final rows = await db.rawQuery(
+      '''
+      SELECT a.*, s.name_arabic AS surah_name_arabic, s.name_english AS surah_name_english
+      FROM ayahs a
+      JOIN surahs s ON s.id = a.surah_id
+      WHERE a.surah_id = ? AND a.ayah_number >= ? AND a.ayah_number <= ?
+      ORDER BY a.ayah_number ASC
+      ''',
+      [surahId, startAyahNumber, endAyahNumber],
+    );
+    return rows.map(AyahRecord.fromMap).toList(growable: false);
+  }
+
   /// Fetches all [LineWord] items belonging to [verseKey] (e.g. `"2:255"`) ordered by appearance.
   Future<List<LineWord>> getWordsForVerseKey(String verseKey) async {
     final db = await database;
@@ -230,7 +303,10 @@ class DatabaseService {
   }
 
   /// Offline Arabic search using stripped/diacritic-free Uthmani text (`text_clean`).
-  Future<List<AyahRecord>> searchAyahs(String rawQuery, {int limit = 100}) async {
+  Future<List<AyahRecord>> searchAyahs(
+    String rawQuery, {
+    int limit = 100,
+  }) async {
     final normalized = ArabicUtils.normalizeForSearch(rawQuery);
     if (normalized.isEmpty) return const <AyahRecord>[];
 
@@ -267,8 +343,7 @@ class DatabaseService {
     args.add('%$normalizedHeh%');
     args.add(limit);
 
-    final rows = await db.rawQuery(
-      '''
+    final rows = await db.rawQuery('''
       SELECT a.*, s.name_arabic AS surah_name_arabic, s.name_english AS surah_name_english
       FROM ayahs a
       JOIN surahs s ON s.id = a.surah_id
@@ -277,9 +352,7 @@ class DatabaseService {
         CASE WHEN a.text_clean LIKE ? OR a.text_clean LIKE ? THEN 0 ELSE 1 END,
         a.id ASC
       LIMIT ?
-      ''',
-      args,
-    );
+      ''', args);
 
     return rows.map(AyahRecord.fromMap).toList(growable: false);
   }
@@ -360,25 +433,36 @@ class DatabaseService {
   }
 
   /// Returns `(verseKey, ayahNumber, textIndopak)` for all ayahs on [pageNumber].
-  Future<List<({String verseKey, int surahId, int ayahNumber, String textIndopak})>>
-      getIndoPakVersesForPage(int pageNumber) async {
+  Future<
+    List<({String verseKey, int surahId, int ayahNumber, String textIndopak})>
+  >
+  getIndoPakVersesForPage(int pageNumber) async {
     final db = await database;
     final rows = await db.query(
       'ayahs',
-      columns: ['verse_key', 'surah_id', 'ayah_number', 'text_indopak', 'text_uthmani'],
+      columns: [
+        'verse_key',
+        'surah_id',
+        'ayah_number',
+        'text_indopak',
+        'text_uthmani',
+      ],
       where: 'page_number = ?',
       whereArgs: [pageNumber],
       orderBy: 'id ASC',
     );
-    return rows.map((r) {
-      final ip = (r['text_indopak'] as String?) ?? (r['text_uthmani'] as String? ?? '');
-      return (
-        verseKey: r['verse_key'] as String,
-        surahId: r['surah_id'] as int,
-        ayahNumber: r['ayah_number'] as int,
-        textIndopak: ip,
-      );
-    }).toList(growable: false);
+    return rows
+        .map((r) {
+          final ip =
+              (r['text_indopak'] as String?) ??
+              (r['text_uthmani'] as String? ?? '');
+          return (
+            verseKey: r['verse_key'] as String,
+            surahId: r['surah_id'] as int,
+            ayahNumber: r['ayah_number'] as int,
+            textIndopak: ip,
+          );
+        })
+        .toList(growable: false);
   }
-
 }

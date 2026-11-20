@@ -53,31 +53,23 @@ enum QuranReciter {
   final String everyAyahFolder;
   final String quranFoundationPath;
 
-  String get displayName => tr(
-        arabicName,
-        switch (this) {
-          QuranReciter.husaryMurattal =>
-            'Sheikh Mahmoud Khalil Al-Husary (Murattal)',
-          QuranReciter.husaryMuallim =>
-            'Sheikh Mahmoud Khalil Al-Husary (Muallim)',
-          QuranReciter.minshawiMurattal =>
-            'Sheikh Muhammad Siddiq Al-Minshawi (Murattal)',
-          QuranReciter.alafasy => 'Sheikh Mishary Rashid Al-Afasy',
-          QuranReciter.abdulBasitMurattal =>
-            'Sheikh Abdul Basit Abdul Samad (Murattal)',
-        },
-      );
+  String get displayName => tr(arabicName, switch (this) {
+    QuranReciter.husaryMurattal => 'Sheikh Mahmoud Khalil Al-Husary (Murattal)',
+    QuranReciter.husaryMuallim => 'Sheikh Mahmoud Khalil Al-Husary (Muallim)',
+    QuranReciter.minshawiMurattal =>
+      'Sheikh Muhammad Siddiq Al-Minshawi (Murattal)',
+    QuranReciter.alafasy => 'Sheikh Mishary Rashid Al-Afasy',
+    QuranReciter.abdulBasitMurattal =>
+      'Sheikh Abdul Basit Abdul Samad (Murattal)',
+  });
 
-  String get shortDisplayName => tr(
-        shortArabicName,
-        switch (this) {
-          QuranReciter.husaryMurattal => 'Al-Husary (Murattal)',
-          QuranReciter.husaryMuallim => 'Al-Husary (Muallim)',
-          QuranReciter.minshawiMurattal => 'Al-Minshawi (Murattal)',
-          QuranReciter.alafasy => 'Al-Afasy',
-          QuranReciter.abdulBasitMurattal => 'Abdul Basit (Murattal)',
-        },
-      );
+  String get shortDisplayName => tr(shortArabicName, switch (this) {
+    QuranReciter.husaryMurattal => 'Al-Husary (Murattal)',
+    QuranReciter.husaryMuallim => 'Al-Husary (Muallim)',
+    QuranReciter.minshawiMurattal => 'Al-Minshawi (Murattal)',
+    QuranReciter.alafasy => 'Al-Afasy',
+    QuranReciter.abdulBasitMurattal => 'Abdul Basit (Murattal)',
+  });
 
   const QuranReciter({
     required this.id,
@@ -207,7 +199,10 @@ class QuranAudioService extends ChangeNotifier {
     _pendingAyahFallbackText = ayahFallbackText;
     _usedOfflineTtsFallback = false;
     _state = QuranAudioState.loadingWord;
-    _statusMessage = tr('جاري تحميل نطق الكلمة...', 'Loading word pronunciation...');
+    _statusMessage = tr(
+      'جاري تحميل نطق الكلمة...',
+      'Loading word pronunciation...',
+    );
     notifyListeners();
 
     final s3 = word.surahId.toString().padLeft(3, '0');
@@ -223,18 +218,17 @@ class QuranAudioService extends ChangeNotifier {
     try {
       final cacheDir = await _ensureCacheDir('wbw');
       final filePath = p.join(cacheDir, fileName);
-      final downloaded = await _ensureAudioFile(
-        filePath: filePath,
-        urls: urls,
-      );
+      final downloaded = await _ensureAudioFile(filePath: filePath, urls: urls);
 
       if (myPlaybackId != _playbackCounter) return;
 
       if (downloaded) {
         _state = QuranAudioState.playingWord;
         _statusMessage = autoPlayAyahAfter
-            ? tr('جاري نطق الكلمة (يتبعها تلاوة الآية)...',
-                'Pronouncing word (followed by ayah)...')
+            ? tr(
+                'جاري نطق الكلمة (يتبعها تلاوة الآية)...',
+                'Pronouncing word (followed by ayah)...',
+              )
             : tr('جاري نطق الكلمة...', 'Pronouncing word...');
         notifyListeners();
 
@@ -305,10 +299,7 @@ class QuranAudioService extends ChangeNotifier {
     try {
       final cacheDir = await _ensureCacheDir('ayahs_${reciter.id}');
       final filePath = p.join(cacheDir, fileName);
-      final downloaded = await _ensureAudioFile(
-        filePath: filePath,
-        urls: urls,
-      );
+      final downloaded = await _ensureAudioFile(filePath: filePath, urls: urls);
 
       if (myPlaybackId != _playbackCounter) return;
 
@@ -377,6 +368,44 @@ class QuranAudioService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Ensures the `.mp3` recitation files for [ayahs] with [reciter] are
+  /// downloaded and cached locally, reporting progress via [onProgress].
+  /// Returns the ordered list of local file paths, or `null` if any file
+  /// could not be fetched (e.g. no internet connection for an uncached ayah).
+  Future<List<String>?> ensureAyahRangeAudioFiles({
+    required List<AyahRecord> ayahs,
+    required QuranReciter reciter,
+    void Function(int completed, int total)? onProgress,
+    bool Function()? isCancelled,
+  }) async {
+    final cacheDir = await _ensureCacheDir('ayahs_${reciter.id}');
+    final paths = <String>[];
+    final total = ayahs.length;
+    onProgress?.call(0, total);
+
+    for (int i = 0; i < total; i++) {
+      if (isCancelled?.call() == true) {
+        return null;
+      }
+      final ayah = ayahs[i];
+      final s3 = ayah.surahId.toString().padLeft(3, '0');
+      final a3 = ayah.ayahNumber.toString().padLeft(3, '0');
+      final fileName = '$s3$a3.mp3';
+      final filePath = p.join(cacheDir, fileName);
+      final urls = <String>[
+        'https://everyayah.com/data/${reciter.everyAyahFolder}/$fileName',
+        'https://verses.quran.foundation/${reciter.quranFoundationPath}/$fileName',
+      ];
+      final ok = await _ensureAudioFile(filePath: filePath, urls: urls);
+      if (isCancelled?.call() == true || !ok) {
+        return null;
+      }
+      paths.add(filePath);
+      onProgress?.call(i + 1, total);
+    }
+    return paths;
+  }
+
   Future<bool> _ensureAudioFile({
     required String filePath,
     required List<String> urls,
@@ -389,8 +418,7 @@ class QuranAudioService extends ChangeNotifier {
       }
     }
 
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 7);
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 7);
     try {
       for (final urlStr in urls) {
         try {

@@ -64,13 +64,15 @@ class KhatmaService {
       (logsByKhatma[entry.khatmaId] ??= <KhatmaProgressEntry>[]).add(entry);
     }
 
-    return khatmaRows.map((row) {
-      final id = row['id'] as int;
-      return KhatmaRecord.fromMap(
-        row,
-        logs: logsByKhatma[id] ?? const <KhatmaProgressEntry>[],
-      );
-    }).toList(growable: false);
+    return khatmaRows
+        .map((row) {
+          final id = row['id'] as int;
+          return KhatmaRecord.fromMap(
+            row,
+            logs: logsByKhatma[id] ?? const <KhatmaProgressEntry>[],
+          );
+        })
+        .toList(growable: false);
   }
 
   /// Starts a new Khatma, assigns it the next sequential serial number, and records start date/time.
@@ -157,10 +159,7 @@ class KhatmaService {
     if (isEndOfQuran) {
       await db.update(
         'khatmas',
-        {
-          'status': KhatmaStatus.completed.dbValue,
-          'completed_at': nowIso,
-        },
+        {'status': KhatmaStatus.completed.dbValue, 'completed_at': nowIso},
         where: 'id = ?',
         whereArgs: [khatmaId],
       );
@@ -191,10 +190,7 @@ class KhatmaService {
     // If the Khatma was completed, rolling back the last mark re-activates it
     await db.update(
       'khatmas',
-      {
-        'status': KhatmaStatus.active.dbValue,
-        'completed_at': null,
-      },
+      {'status': KhatmaStatus.active.dbValue, 'completed_at': null},
       where: 'id = ?',
       whereArgs: [khatmaId],
     );
@@ -229,10 +225,7 @@ class KhatmaService {
     final nowIso = DateTime.now().toIso8601String();
     await db.update(
       'khatmas',
-      {
-        'status': KhatmaStatus.completed.dbValue,
-        'completed_at': nowIso,
-      },
+      {'status': KhatmaStatus.completed.dbValue, 'completed_at': nowIso},
       where: 'id = ?',
       whereArgs: [khatmaId],
     );
@@ -254,8 +247,10 @@ class KhatmaService {
   /// Generates a full statistical [KhatmaReport] for [khatma].
   KhatmaReport generateReport(KhatmaRecord khatma) {
     final start = khatma.startedAt;
-    final end = khatma.completedAt ??
-        (khatma.currentMark?.recordedAt ?? DateTime.now());
+    final now = DateTime.now();
+    final end = khatma.isCompleted
+        ? (khatma.completedAt ?? (khatma.currentMark?.recordedAt ?? now))
+        : now;
     final rawDiff = end.difference(start);
     final exactDuration = rawDiff.isNegative ? Duration.zero : rawDiff;
 
@@ -281,6 +276,25 @@ class KhatmaService {
     final avgAyahs = totalAyahsReached / effectiveDays;
     final avgPages = totalPagesReached / effectiveDays;
     final avgJuz = totalJuzReached / effectiveDays;
+
+    final int lettersRead = DatabaseService.instance
+        .getCumulativeLettersUpToAyah(totalAyahsReached);
+    final int estimatedHasanat = lettersRead * 10;
+
+    int? estimatedRemainingDays;
+    DateTime? estimatedCompletionDate;
+    if (khatma.isCompleted) {
+      estimatedRemainingDays = 0;
+      estimatedCompletionDate = end;
+    } else if (totalAyahsReached > 0 && avgAyahs > 0) {
+      final remainingAyahs = math.max(6236 - totalAyahsReached, 0);
+      estimatedRemainingDays = (remainingAyahs / avgAyahs).ceil();
+      estimatedCompletionDate = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).add(Duration(days: estimatedRemainingDays));
+    }
 
     // Analyze usual time of day from all progress timestamps (and start timestamp if no logs)
     final slotCounts = <ReadingTimeSlot, int>{
@@ -334,6 +348,10 @@ class KhatmaService {
       usualReadingSlot: bestSlot,
       peakReadingHour: peakHour,
       slotDistribution: slotCounts,
+      estimatedCompletionDate: estimatedCompletionDate,
+      estimatedRemainingDays: estimatedRemainingDays,
+      totalLettersRead: lettersRead,
+      estimatedHasanat: estimatedHasanat,
     );
   }
 }

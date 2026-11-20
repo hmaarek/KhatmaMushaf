@@ -14,6 +14,7 @@ import 'index_sheet.dart';
 import 'khatma_sheet.dart';
 import 'search_sheet.dart';
 import 'settings_sheet.dart';
+import 'share_ayah_sheet.dart';
 
 class ReaderScreen extends StatefulWidget {
   final MushafController controller;
@@ -1020,7 +1021,155 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Word Pronunciation & Full Ayah Recitation Card
+                      // 1. Khatma Progress Mark Button at the TOP of the pop-up menu
+                      if (isCurrentKhatmaMark)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: theme.bookmarkRibbon,
+                            side: BorderSide(
+                              color: theme.bookmarkRibbon,
+                              width: 1.4,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final updated = await widget.controller
+                                .deleteCurrentKhatmaMark();
+                            if (!sheetCtx.mounted) return;
+                            Navigator.of(sheetCtx).pop();
+                            if (!context.mounted) return;
+                            final prev = updated?.currentMark;
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  duration: const Duration(milliseconds: 1800),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: theme.hudSurface,
+                                  content: Directionality(
+                                    textDirection: L10n.dir,
+                                    child: Text(
+                                      prev != null
+                                          ? tr(
+                                              'تم حذف علامة الختمة والعودة للموضع السابق: سورة ${prev.surahNameArabic} آية ${L10n.n(prev.ayahNumber)}',
+                                              'Khatma mark removed and returned to the previous position: Surah ${_enSurah(prev.surahId, prev.surahNameArabic)} ayah ${L10n.n(prev.ayahNumber)}',
+                                            )
+                                          : tr(
+                                              'تم حذف علامة الختمة الحالية',
+                                              'Current khatma mark removed',
+                                            ),
+                                      style: TextStyle(color: theme.hudText),
+                                    ),
+                                  ),
+                                ),
+                              );
+                          },
+                          icon: const Icon(Icons.undo_rounded, size: 20),
+                          label: Text(
+                            tr(
+                              'حذف علامة الختمة (العودة للموضع السابق)',
+                              'Remove khatma mark (return to previous)',
+                            ),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2B8A62),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final isLastAyah =
+                                ayah.id >= 6236 ||
+                                (ayah.surahId == 114 && ayah.ayahNumber == 6);
+                            if (activeKhatma == null && isLastAyah) {
+                              Navigator.of(sheetCtx).pop();
+                              if (!context.mounted) return;
+                              final confirmed =
+                                  await _showNoActiveKhatmaConfirmationDialog(
+                                    context,
+                                  );
+                              if (!context.mounted || !confirmed) return;
+                              final completed = await widget.controller
+                                  .completeActiveKhatma(createIfNone: true);
+                              if (!context.mounted || completed == null) return;
+                              await showKhatmaReportModal(
+                                context,
+                                controller: widget.controller,
+                                khatma: completed,
+                                isJustCompletedCelebration: true,
+                              );
+                              return;
+                            }
+
+                            final res = await widget.controller.markKhatmaAyah(
+                              ayah,
+                            );
+                            if (!sheetCtx.mounted) return;
+                            Navigator.of(sheetCtx).pop();
+                            if (!context.mounted) return;
+
+                            if (res.justCompleted) {
+                              await showKhatmaReportModal(
+                                context,
+                                controller: widget.controller,
+                                khatma: res.khatma,
+                                isJustCompletedCelebration: true,
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    duration: const Duration(
+                                      milliseconds: 1600,
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: theme.hudSurface,
+                                    content: Directionality(
+                                      textDirection: L10n.dir,
+                                      child: Text(
+                                        tr(
+                                          'تم تحديث علامة ${res.khatma.displayTitle} عند سورة ${ayah.surahNameArabic} آية ${L10n.n(ayah.ayahNumber)}',
+                                          '${res.khatma.displayTitle} mark updated at Surah $ayahSurahName ayah ${L10n.n(ayah.ayahNumber)}',
+                                        ),
+                                        style: TextStyle(color: theme.hudText),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                            }
+                          },
+                          icon: const Icon(Icons.flag_rounded, size: 22),
+                          label: Text(
+                            activeKhatma != null
+                                ? tr(
+                                    'تحديد كعلامة الختمة الحالية (#${L10n.n(activeKhatma.serialNumber)})',
+                                    'Set as current khatma mark (#${L10n.n(activeKhatma.serialNumber)})',
+                                  )
+                                : tr(
+                                    'بدء ختمة جديدة وتحديد هذه الآية كعلامة',
+                                    'Start a new khatma and mark this ayah',
+                                  ),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+
+                      // 2. Word Pronunciation & Full Ayah Recitation Card
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1299,150 +1448,35 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Khatma Progress Mark Button (Set or Delete/Rollback)
-                      if (isCurrentKhatmaMark)
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: theme.bookmarkRibbon,
-                            side: BorderSide(
-                              color: theme.bookmarkRibbon,
-                              width: 1.4,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final updated = await widget.controller
-                                .deleteCurrentKhatmaMark();
-                            if (!sheetCtx.mounted) return;
-                            Navigator.of(sheetCtx).pop();
-                            if (!context.mounted) return;
-                            final prev = updated?.currentMark;
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  duration: const Duration(milliseconds: 1800),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: theme.hudSurface,
-                                  content: Directionality(
-                                    textDirection: L10n.dir,
-                                    child: Text(
-                                      prev != null
-                                          ? tr(
-                                              'تم حذف علامة الختمة والعودة للموضع السابق: سورة ${prev.surahNameArabic} آية ${L10n.n(prev.ayahNumber)}',
-                                              'Khatma mark removed and returned to the previous position: Surah ${_enSurah(prev.surahId, prev.surahNameArabic)} ayah ${L10n.n(prev.ayahNumber)}',
-                                            )
-                                          : tr(
-                                              'تم حذف علامة الختمة الحالية',
-                                              'Current khatma mark removed',
-                                            ),
-                                      style: TextStyle(color: theme.hudText),
-                                    ),
-                                  ),
-                                ),
-                              );
-                          },
-                          icon: const Icon(Icons.undo_rounded, size: 20),
-                          label: Text(
-                            tr(
-                              'حذف علامة الختمة (العودة للموضع السابق)',
-                              'Remove khatma mark (return to previous)',
-                            ),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        )
-                      else
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2B8A62),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final isLastAyah =
-                                ayah.id >= 6236 ||
-                                (ayah.surahId == 114 && ayah.ayahNumber == 6);
-                            if (activeKhatma == null && isLastAyah) {
-                              Navigator.of(sheetCtx).pop();
-                              if (!context.mounted) return;
-                              final confirmed =
-                                  await _showNoActiveKhatmaConfirmationDialog(
-                                    context,
-                                  );
-                              if (!context.mounted || !confirmed) return;
-                              final completed = await widget.controller
-                                  .completeActiveKhatma(createIfNone: true);
-                              if (!context.mounted || completed == null) return;
-                              await showKhatmaReportModal(
-                                context,
-                                controller: widget.controller,
-                                khatma: completed,
-                                isJustCompletedCelebration: true,
-                              );
-                              return;
-                            }
-
-                            final res = await widget.controller.markKhatmaAyah(
-                              ayah,
-                            );
-                            if (!sheetCtx.mounted) return;
-                            Navigator.of(sheetCtx).pop();
-                            if (!context.mounted) return;
-
-                            if (res.justCompleted) {
-                              await showKhatmaReportModal(
-                                context,
-                                controller: widget.controller,
-                                khatma: res.khatma,
-                                isJustCompletedCelebration: true,
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    duration: const Duration(
-                                      milliseconds: 1600,
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                    backgroundColor: theme.hudSurface,
-                                    content: Directionality(
-                                      textDirection: L10n.dir,
-                                      child: Text(
-                                        tr(
-                                          'تم تحديث علامة ${res.khatma.displayTitle} عند سورة ${ayah.surahNameArabic} آية ${L10n.n(ayah.ayahNumber)}',
-                                          '${res.khatma.displayTitle} mark updated at Surah $ayahSurahName ayah ${L10n.n(ayah.ayahNumber)}',
-                                        ),
-                                        style: TextStyle(color: theme.hudText),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                            }
-                          },
-                          icon: const Icon(Icons.flag_rounded, size: 20),
-                          label: Text(
-                            activeKhatma != null
-                                ? tr(
-                                    'تحديد كعلامة الختمة الحالية (#${L10n.n(activeKhatma.serialNumber)})',
-                                    'Set as current khatma mark (#${L10n.n(activeKhatma.serialNumber)})',
-                                  )
-                                : tr(
-                                    'بدء ختمة جديدة وتحديد هذه الآية كعلامة',
-                                    'Start a new khatma and mark this ayah',
-                                  ),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                      // Share Ayah / Ayat Button (Decorated Image or Text with/without Tashkeel)
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.ornamentPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-
+                        onPressed: () {
+                          Navigator.of(sheetCtx).pop();
+                          showShareAyahsSheet(
+                            context,
+                            controller: widget.controller,
+                            initialAyah: ayah,
+                          );
+                        },
+                        icon: const Icon(Icons.ios_share_rounded, size: 20),
+                        label: Text(
+                          tr(
+                            'مشاركة الآية أو عدة آيات (صورة مزخرفة أو نص)',
+                            'Share Ayah / Ayat (Decorated Image or Text)',
+                            'آیت یا آیات شیئر کریں (خوبصورت تصویر یا متن)',
+                          ),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -1618,6 +1652,8 @@ class _VerticalMushafScrollerState extends State<_VerticalMushafScroller> {
   ScrollController? _scroll;
   double _extent = 0;
   bool _syncing = false;
+  bool _showSnapGlow = false;
+  Timer? _snapGlowTimer;
 
   @override
   void initState() {
@@ -1627,12 +1663,28 @@ class _VerticalMushafScrollerState extends State<_VerticalMushafScroller> {
 
   @override
   void dispose() {
+    _snapGlowTimer?.cancel();
     if (widget.controller.verticalJumpHandler == _jumpToPage) {
       widget.controller.verticalJumpHandler = null;
     }
     _scroll?.removeListener(_onScroll);
     _scroll?.dispose();
     super.dispose();
+  }
+
+  void _onSnapTriggered() {
+    widget.controller.triggerSnapHaptic();
+    if (!mounted) return;
+    _snapGlowTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _showSnapGlow = true);
+      _snapGlowTimer = Timer(const Duration(milliseconds: 260), () {
+        if (mounted) {
+          setState(() => _showSnapGlow = false);
+        }
+      });
+    });
   }
 
   void _jumpToPage(int page) {
@@ -1682,19 +1734,291 @@ class _VerticalMushafScrollerState extends State<_VerticalMushafScroller> {
         }
         _extent = extent;
 
-        return ListView.builder(
-          controller: _scroll,
-          itemExtent: extent,
-          itemCount: 604,
-          physics: widget.locked
-              ? const NeverScrollableScrollPhysics()
-              : const BouncingScrollPhysics(
+        final ScrollPhysics activePhysics = widget.locked
+            ? const NeverScrollableScrollPhysics()
+            : widget.controller.verticalSnap
+            ? _MushafEdgeSnapScrollPhysics(
+                pageExtent: extent,
+                onSnapTriggered: _onSnapTriggered,
+                parent: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
-          itemBuilder: (context, index) =>
-              widget.pageBuilder(context, index + 1),
+              )
+            : const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              );
+
+        final theme = widget.controller.theme;
+        return Stack(
+          children: [
+            ListView.builder(
+              controller: _scroll,
+              itemExtent: extent,
+              itemCount: 604,
+              physics: activePhysics,
+              itemBuilder: (context, index) =>
+                  widget.pageBuilder(context, index + 1),
+            ),
+            // Lightweight top-edge alignment glow pulse when a page snaps into place
+            Positioned(
+              top: 0,
+              left: 16,
+              right: 16,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _showSnapGlow ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: Container(
+                    height: 3.0,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.ornamentPrimary.withValues(alpha: 0.0),
+                          theme.ornamentPrimary.withValues(alpha: 0.85),
+                          theme.ornamentPrimary.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
+  }
+}
+
+/// Custom [ScrollPhysics] for "Vertical Scroll with snap to edge":
+///
+/// 1. Preserves 100% natural [BouncingScrollPhysics] friction when the user
+///    scrolls or flings fast across pages.
+/// 2. Allows the user to deliberately stop anywhere in the middle of a page
+///    (lines 2–14) without any forced snap.
+/// 3. When the scroll stops (either right when the finger lifts at low/zero
+///    velocity, or right when a fast friction glide finishes decelerating)
+///    with less than ~1 line remaining from the top page edge, smoothly glides
+///    the page edge flush to the top of the screen with a lightweight ease-out
+///    animation and triggers [onSnapTriggered] (subtle haptic + edge glow).
+class _MushafEdgeSnapScrollPhysics extends ScrollPhysics {
+  final double pageExtent;
+  final VoidCallback? onSnapTriggered;
+
+  const _MushafEdgeSnapScrollPhysics({
+    required this.pageExtent,
+    this.onSnapTriggered,
+    super.parent,
+  });
+
+  @override
+  _MushafEdgeSnapScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _MushafEdgeSnapScrollPhysics(
+      pageExtent: pageExtent,
+      onSnapTriggered: onSnapTriggered,
+      parent: buildParent(ancestor),
+    );
+  }
+
+  /// Distance threshold from a page top boundary (`k * pageExtent`) within
+  /// which the edge snap activates: equals the page header/footer frame
+  /// margin (~42 px) plus ~1.45 Quran line slots (so as soon as Line 14 scrolls
+  /// off and only 1 line + footer remains at the top edge, the snap kicks in).
+  double get _snapZone {
+    final double oneLineHeight = ((pageExtent - 70.0) / 15.0).clamp(
+      28.0,
+      110.0,
+    );
+    return 42.0 + (oneLineHeight * 1.45);
+  }
+
+  /// Finds the duration (in seconds) until [sim] comes to a stop.
+  double _findStopTime(Simulation sim) {
+    if (sim.isDone(0.0)) return 0.0;
+    double low = 0.0;
+    double high = 0.5;
+    while (!sim.isDone(high) && high < 12.0) {
+      low = high;
+      high *= 2.0;
+    }
+    for (int i = 0; i < 20; i++) {
+      final mid = (low + high) * 0.5;
+      if (sim.isDone(mid)) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+    return high;
+  }
+
+  @override
+  Simulation? createBallisticSimulation(
+    ScrollMetrics position,
+    double velocity,
+  ) {
+    if (pageExtent <= 0 || position.outOfRange) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+
+    final Tolerance tolerance = toleranceFor(position);
+    final double zone = _snapZone;
+
+    final double currentNearestEdge =
+        ((position.pixels / pageExtent).roundToDouble() * pageExtent).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        );
+    final double currentDist = (currentNearestEdge - position.pixels).abs();
+
+    // Case 1: Finger lifted after stopping or slow dragging (velocity <= 420 px/s).
+    // On a real touchscreen, lifting a stationary finger often reports 50-350 px/s.
+    // If the page is already within the 1-line snap zone of the top edge, snap immediately.
+    if (velocity.abs() <= 420.0) {
+      if (currentDist > tolerance.distance && currentDist <= zone) {
+        return _SmoothEdgeSnapSimulation(
+          start: position.pixels,
+          end: currentNearestEdge,
+          durationSeconds: 0.26,
+          onSnapStart: onSnapTriggered,
+          tolerance: tolerance,
+        );
+      }
+      if (velocity.abs() <= tolerance.velocity) {
+        return null;
+      }
+    }
+
+    // Case 2: Fast scroll / fling — run natural BouncingScrollPhysics friction first.
+    final Simulation? frictionSim = super.createBallisticSimulation(
+      position,
+      velocity,
+    );
+    if (frictionSim == null) return null;
+
+    final double stopTime = _findStopTime(frictionSim);
+    final double stopPixels = frictionSim.x(stopTime);
+
+    // If the fling overshoots Page 1 or Page 604, let BouncingScrollPhysics handle the bounce.
+    if (stopPixels <= position.minScrollExtent ||
+        stopPixels >= position.maxScrollExtent) {
+      return frictionSim;
+    }
+
+    final double nearestTopEdge =
+        ((stopPixels / pageExtent).roundToDouble() * pageExtent).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        );
+    final double dist = (nearestTopEdge - stopPixels).abs();
+
+    // If the friction glide stops in the middle of a page, do not snap.
+    if (dist <= tolerance.distance || dist > zone) {
+      return frictionSim;
+    }
+
+    // The friction glide stops within ~1 line of a page top edge: let the full
+    // friction deceleration play out until [stopTime], then smoothly ease to [nearestTopEdge].
+    final Simulation snapSim = _SmoothEdgeSnapSimulation(
+      start: stopPixels,
+      end: nearestTopEdge,
+      durationSeconds: 0.26,
+      onSnapStart: onSnapTriggered,
+      tolerance: tolerance,
+    );
+    return _FrictionThenEdgeSnapSimulation(
+      frictionSim: frictionSim,
+      frictionEndTime: stopTime,
+      snapSim: snapSim,
+    );
+  }
+}
+
+/// Lightweight cubic ease-out simulation that smoothly glides from [start]
+/// to [end] over [durationSeconds] and fires [onSnapStart] once when started.
+class _SmoothEdgeSnapSimulation extends Simulation {
+  final double start;
+  final double end;
+  final double durationSeconds;
+  final VoidCallback? onSnapStart;
+  bool _notified = false;
+
+  _SmoothEdgeSnapSimulation({
+    required this.start,
+    required this.end,
+    this.durationSeconds = 0.26,
+    this.onSnapStart,
+    super.tolerance,
+  });
+
+  void _ensureNotified() {
+    if (!_notified) {
+      _notified = true;
+      onSnapStart?.call();
+    }
+  }
+
+  @override
+  double x(double time) {
+    _ensureNotified();
+    if (time <= 0.0) return start;
+    if (time >= durationSeconds) return end;
+    final double t = (time / durationSeconds).clamp(0.0, 1.0);
+    final double eased = Curves.easeOutCubic.transform(t);
+    return start + (end - start) * eased;
+  }
+
+  @override
+  double dx(double time) {
+    if (time <= 0.0 || time >= durationSeconds) return 0.0;
+    final double t = (time / durationSeconds).clamp(0.0, 1.0);
+    final double oneMinusT = 1.0 - t;
+    // Derivative of easeOutCubic (1 - (1 - t)^3) is 3 * (1 - t)^2
+    return (end - start) * (3.0 * oneMinusT * oneMinusT) / durationSeconds;
+  }
+
+  @override
+  bool isDone(double time) {
+    return time >= durationSeconds;
+  }
+}
+
+/// Plays [frictionSim] until it naturally stops at [frictionEndTime], and then
+/// seamlessly plays [snapSim] to align the nearby page edge.
+class _FrictionThenEdgeSnapSimulation extends Simulation {
+  final Simulation frictionSim;
+  final double frictionEndTime;
+  final Simulation snapSim;
+
+  _FrictionThenEdgeSnapSimulation({
+    required this.frictionSim,
+    required this.frictionEndTime,
+    required this.snapSim,
+  });
+
+  @override
+  double x(double time) {
+    if (time <= frictionEndTime) {
+      return frictionSim.x(time);
+    }
+    return snapSim.x(time - frictionEndTime);
+  }
+
+  @override
+  double dx(double time) {
+    if (time <= frictionEndTime) {
+      return frictionSim.dx(time);
+    }
+    return snapSim.dx(time - frictionEndTime);
+  }
+
+  @override
+  bool isDone(double time) {
+    if (time <= frictionEndTime) {
+      return false;
+    }
+    return snapSim.isDone(time - frictionEndTime);
   }
 }

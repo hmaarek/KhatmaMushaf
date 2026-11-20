@@ -94,10 +94,17 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                   children: [
                                     Text(
                                       pageData == null
-                                          ? tr('المصحف الشريف', 'The Holy Quran')
+                                          ? tr(
+                                              'المصحف الشريف',
+                                              'The Holy Quran',
+                                            )
                                           : (L10n.isEn
-                                              ? pageData.info.surahNamesEnglish
-                                              : pageData.info.surahNamesArabic),
+                                                ? pageData
+                                                      .info
+                                                      .surahNamesEnglish
+                                                : pageData
+                                                      .info
+                                                      .surahNamesArabic),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -120,8 +127,9 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: theme.hudText
-                                            .withValues(alpha: 0.75),
+                                        color: theme.hudText.withValues(
+                                          alpha: 0.75,
+                                        ),
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -143,8 +151,9 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                   ..hideCurrentSnackBar()
                                   ..showSnackBar(
                                     SnackBar(
-                                      duration:
-                                          const Duration(milliseconds: 1400),
+                                      duration: const Duration(
+                                        milliseconds: 1400,
+                                      ),
                                       behavior: SnackBarBehavior.floating,
                                       backgroundColor: theme.hudSurface,
                                       content: Directionality(
@@ -153,11 +162,15 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                           added
                                               ? tr(
                                                   'تم حفظ علامة الصفحة ${ArabicUtils.toArabicDigits(currentPage)}',
-                                                  'Bookmarked page $currentPage')
+                                                  'Bookmarked page $currentPage',
+                                                )
                                               : tr(
                                                   'تم إزالة علامة الصفحة ${ArabicUtils.toArabicDigits(currentPage)}',
-                                                  'Removed bookmark on page $currentPage'),
-                                          style: TextStyle(color: theme.hudText),
+                                                  'Removed bookmark on page $currentPage',
+                                                ),
+                                          style: TextStyle(
+                                            color: theme.hudText,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -195,6 +208,16 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                               tooltip: tr('إعدادات الخط والعرض', 'Settings'),
                               theme: theme,
                               onTap: widget.onOpenSettings,
+                            ),
+                            _HudIconButton(
+                              icon: Icons.help_outline_rounded,
+                              tooltip: tr(
+                                'شرح التطبيق (فيديو)',
+                                'Help (Video Tutorial)',
+                                'مدد (ویڈیو گائیڈ)',
+                              ),
+                              theme: theme,
+                              onTap: () => widget.controller.openHelpVideo(),
                             ),
                           ],
                         ),
@@ -249,8 +272,10 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                tr('صفحة ${ArabicUtils.toArabicDigits(activeSliderPage)} من ٦٠٤',
-                                    'Page $activeSliderPage of 604'),
+                                tr(
+                                  'صفحة ${ArabicUtils.toArabicDigits(activeSliderPage)} من ٦٠٤',
+                                  'Page $activeSliderPage of 604',
+                                ),
                                 style: TextStyle(
                                   color: theme.hudText,
                                   fontSize: 13,
@@ -266,15 +291,18 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: widget.controller.activeKhatma != null
+                                    color:
+                                        widget.controller.activeKhatma != null
                                         ? const Color(0xFF2B8A62)
                                         : theme.hudSurface,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: widget.controller.activeKhatma != null
+                                      color:
+                                          widget.controller.activeKhatma != null
                                           ? const Color(0xFF2B8A62)
-                                          : theme.ornamentSecondary
-                                              .withValues(alpha: 0.45),
+                                          : theme.ornamentSecondary.withValues(
+                                              alpha: 0.45,
+                                            ),
                                     ),
                                   ),
                                   child: Row(
@@ -283,7 +311,9 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                       Icon(
                                         Icons.workspace_premium_rounded,
                                         size: 15,
-                                        color: widget.controller.activeKhatma != null
+                                        color:
+                                            widget.controller.activeKhatma !=
+                                                null
                                             ? Colors.white
                                             : theme.ornamentSecondary,
                                       ),
@@ -296,7 +326,9 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                               )
                                             : tr('قراءة حرة', 'Free reading'),
                                         style: TextStyle(
-                                          color: widget.controller.activeKhatma != null
+                                          color:
+                                              widget.controller.activeKhatma !=
+                                                  null
                                               ? Colors.white
                                               : theme.hudText,
                                           fontSize: 11.5,
@@ -339,8 +371,8 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                 child: SliderTheme(
                                   data: SliderTheme.of(context).copyWith(
                                     activeTrackColor: theme.ornamentPrimary,
-                                    inactiveTrackColor:
-                                        theme.hudText.withValues(alpha: 0.2),
+                                    inactiveTrackColor: theme.hudText
+                                        .withValues(alpha: 0.2),
                                     thumbColor: theme.ornamentSecondary,
                                     overlayColor: theme.ornamentPrimary
                                         .withValues(alpha: 0.25),
@@ -350,16 +382,19 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
                                     min: 1,
                                     max: 604,
                                     divisions: 603,
-                                    value: (_scrubPage ??
-                                            currentPage.toDouble())
-                                        .clamp(1.0, 604.0),
+                                    value:
+                                        (_scrubPage ?? currentPage.toDouble())
+                                            .clamp(1.0, 604.0),
                                     onChanged: (value) {
                                       setState(() {
                                         _scrubPage = value;
                                       });
                                     },
                                     onChangeEnd: (value) {
-                                      final target = value.round().clamp(1, 604);
+                                      final target = value.round().clamp(
+                                        1,
+                                        604,
+                                      );
                                       setState(() {
                                         _scrubPage = null;
                                       });
@@ -406,77 +441,82 @@ class _ReaderHudOverlayState extends State<ReaderHudOverlay> {
   }
 
   String _themeLabel(MushafThemeData t) => switch (t.type) {
-        MushafThemeType.warmPaper => tr(t.arabicLabel, 'Mushaf paper'),
-        MushafThemeType.crispWhite => tr(t.arabicLabel, 'Bright white'),
-        MushafThemeType.amoledDark => tr(t.arabicLabel, 'AMOLED dark'),
-      };
+    MushafThemeType.warmPaper => tr(t.arabicLabel, 'Mushaf paper'),
+    MushafThemeType.crispWhite => tr(t.arabicLabel, 'Bright white'),
+    MushafThemeType.amoledDark => tr(t.arabicLabel, 'AMOLED dark'),
+  };
 
   Widget _buildThemeSelectorRow(MushafThemeData activeTheme) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Row(
-        children: MushafThemeData.all.map((themeOption) {
-          final isSelected = themeOption.type == activeTheme.type;
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10.0),
-                onTap: () => widget.controller.setTheme(themeOption.type),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 7.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? activeTheme.ornamentPrimary.withValues(alpha: 0.28)
-                        : activeTheme.hudSurface,
+        children: MushafThemeData.all
+            .map((themeOption) {
+              final isSelected = themeOption.type == activeTheme.type;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(10.0),
-                    border: Border.all(
-                      color: isSelected
-                          ? activeTheme.ornamentSecondary
-                          : activeTheme.hudText.withValues(alpha: 0.14),
-                      width: isSelected ? 1.4 : 1.0,
+                    onTap: () => widget.controller.setTheme(themeOption.type),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 7.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? activeTheme.ornamentPrimary.withValues(
+                                alpha: 0.28,
+                              )
+                            : activeTheme.hudSurface,
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(
+                          color: isSelected
+                              ? activeTheme.ornamentSecondary
+                              : activeTheme.hudText.withValues(alpha: 0.14),
+                          width: isSelected ? 1.4 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: themeOption.pageBackground,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: themeOption.ornamentPrimary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              _themeLabel(themeOption),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: activeTheme.hudText,
+                                fontSize: 11.5,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: themeOption.pageBackground,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: themeOption.ornamentPrimary,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          _themeLabel(themeOption),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: activeTheme.hudText,
-                            fontSize: 11.5,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
-            ),
-          );
-        }).toList(growable: false),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }
@@ -521,11 +561,7 @@ class _HudIconButton extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    effectiveIcon,
-                    size: 28,
-                    color: theme.hudText,
-                  ),
+                  Icon(effectiveIcon, size: 28, color: theme.hudText),
                   if (label != null) ...[
                     const SizedBox(width: 4),
                     Text(

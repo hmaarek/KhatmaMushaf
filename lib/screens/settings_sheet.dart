@@ -909,7 +909,126 @@ class SettingsSheet extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // Section 5: Page navigation & orientation
+                          // Section 5: Page scrolling mode (3 options) & landscape orientation
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.swap_vert_circle_outlined,
+                                color: theme.ornamentPrimary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                tr(
+                                  'طريقة تصفح الصفحات واتجاه الشاشة',
+                                  'Page Scrolling & Screen Orientation',
+                                  'صفحات کی اسکرولنگ اور اسکرین کا رخ',
+                                ),
+                                style: TextStyle(
+                                  color: theme.glyphColor,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          ...MushafScrollMode.values.map((mode) {
+                            final isSelected = controller.scrollMode == mode;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () => controller.setScrollMode(mode),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 11,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? theme.ornamentPrimary.withValues(
+                                            alpha: 0.14,
+                                          )
+                                        : theme.ornamentFill,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? theme.ornamentPrimary
+                                          : theme.pageInnerBorder,
+                                      width: isSelected ? 1.8 : 1.1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? theme.ornamentPrimary
+                                              : theme.pageBackground,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? theme.ornamentPrimary
+                                                : theme.pageInnerBorder,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          mode.icon,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : theme.ornamentPrimary,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              mode.title,
+                                              style: TextStyle(
+                                                color: theme.glyphColor,
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              mode.subtitle,
+                                              style: TextStyle(
+                                                color: theme.secondaryTextColor,
+                                                fontSize: 12,
+                                                height: 1.3,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        isSelected
+                                            ? Icons.radio_button_checked_rounded
+                                            : Icons.radio_button_off_rounded,
+                                        color: isSelected
+                                            ? theme.ornamentPrimary
+                                            : theme.secondaryTextColor,
+                                        size: 21,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -926,16 +1045,16 @@ class SettingsSheet extends StatelessWidget {
                                   contentPadding: EdgeInsets.zero,
                                   activeThumbColor: theme.ornamentPrimary,
                                   secondary: Icon(
-                                    Icons.swap_vert_rounded,
+                                    Icons.vibration_rounded,
                                     color: theme.ornamentPrimary,
                                   ),
-                                  value: controller.verticalScroll,
-                                  onChanged: controller.setVerticalScroll,
+                                  value: controller.snapHapticEnabled,
+                                  onChanged: controller.setSnapHapticEnabled,
                                   title: Text(
                                     tr(
-                                      'التمرير العمودي للصفحات',
-                                      'Vertical page scrolling',
-                                      'صفحات کی عمودی اسکرولنگ',
+                                      'اهتزاز خفيف عند محاذاة الصفحة',
+                                      'Subtle haptic on page snap',
+                                      'صفحہ جڑنے پر ہلکی وائبریشن',
                                     ),
                                     style: TextStyle(
                                       color: theme.glyphColor,
@@ -945,9 +1064,9 @@ class SettingsSheet extends StatelessWidget {
                                   ),
                                   subtitle: Text(
                                     tr(
-                                      'تمرير سلس للأعلى والأسفل بدلاً من قلب الصفحات جانبياً',
-                                      'Smooth up/down scrolling instead of flipping pages sideways',
-                                      'صفحات پلٹنے کے بجائے اوپر نیچے ہموار اسکرولنگ',
+                                      'نبضة لمسية هادئة جداً عند استقرار الصفحة عند الحافة',
+                                      'Very gentle haptic tick when a page snaps to the top edge',
+                                      'صفحہ کنارے پر رکنے پر بہت ہلکا لمسی احساس',
                                     ),
                                     style: TextStyle(
                                       color: theme.secondaryTextColor,
@@ -993,6 +1112,109 @@ class SettingsSheet extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          // Section 6: Video Help Button (YouTube)
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.ornamentPrimary,
+                              backgroundColor: theme.ornamentPrimary.withValues(
+                                alpha: 0.08,
+                              ),
+                              side: BorderSide(
+                                color: theme.ornamentPrimary,
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () => controller.openHelpVideo(),
+                            icon: const Icon(
+                              Icons.play_circle_fill_rounded,
+                              size: 22,
+                            ),
+                            label: Text(
+                              tr(
+                                'مساعدة وشرح استخدام التطبيق (فيديو يوتيوب)',
+                                'Help & App Tutorial (YouTube Video)',
+                                'مدد اور ایپ کے استعمال کی ویڈیو (یوٹیوب)',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF2B8A62),
+                              backgroundColor: const Color(
+                                0xFF2B8A62,
+                              ).withValues(alpha: 0.08),
+                              side: const BorderSide(
+                                color: Color(0xFF2B8A62),
+                                width: 1.4,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 13,
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final ok = await controller
+                                  .triggerTestKhatmaReminder();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    duration: const Duration(seconds: 3),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: theme.hudSurface,
+                                    content: Directionality(
+                                      textDirection: L10n.dir,
+                                      child: Text(
+                                        ok
+                                            ? tr(
+                                                'سيظهر إشعار التذكير بالختمة خلال ٥ ثوانٍ...',
+                                                'Khatma reminder notification will appear in 5 seconds...',
+                                                'ختمہ کی یاددہانی کا نوٹیفکیشن ٥ سیکنڈ میں ظاہر ہوگا...',
+                                              )
+                                            : tr(
+                                                'يرجى تفعيل الإشعارات للتطبيق من إعدادات الجهاز',
+                                                'Please allow notifications for the app in device settings',
+                                                'براہِ کرم فون کی سیٹنگز میں ایپ کے نوٹیفکیشنز آن کریں',
+                                              ),
+                                        style: TextStyle(color: theme.hudText),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                            },
+                            icon: const Icon(
+                              Icons.notifications_active_rounded,
+                              size: 21,
+                            ),
+                            label: Text(
+                              tr(
+                                'تجربة إشعار التذكير بالختمة (بعد ٥ ثوانٍ)',
+                                'Test Khatma Reminder Notification (in 5s)',
+                                'ختمہ کی یاددہانی کا ٹیسٹ نوٹیفکیشن (٥ سیکنڈ میں)',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ],

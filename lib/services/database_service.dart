@@ -148,6 +148,15 @@ class DatabaseService {
     _cumulativeLettersByAyah = cumulative;
   }
 
+  /// Returns the total number of Arabic letters across all 6,236 ayahs of the Quran.
+  int get totalQuranLetters {
+    final table = _cumulativeLettersByAyah;
+    if (table != null && table.length > 6236 && table[6236] > 0) {
+      return table[6236];
+    }
+    return 324290;
+  }
+
   /// Returns the cumulative number of Quranic Arabic letters from Ayah 1 up to
   /// [ayahGlobalId] (1..6236). Total letters across the Quran = 324,290.
   int getCumulativeLettersUpToAyah(int ayahGlobalId) {

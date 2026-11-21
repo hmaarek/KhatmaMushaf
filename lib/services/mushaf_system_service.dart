@@ -27,9 +27,19 @@ class MushafSystemService {
     }
   }
 
-  /// Placeholder YouTube tutorial URL (to be updated when the final URL is provided).
-  static const String helpYoutubeUrl =
-      'https://www.youtube.com/results?search_query=Khatma+Mushaf';
+  /// Language-specific YouTube tutorial URLs.
+  static const String helpYoutubeUrlAr = 'https://youtu.be/tmzo2asUEIU';
+  static const String helpYoutubeUrlEn =
+      'https://youtube.com/shorts/3ZGP-RqtvYE';
+  static const String helpYoutubeUrlUr =
+      'https://youtube.com/shorts/4wVwTujVAmU';
+
+  /// Returns the tutorial YouTube URL matching [lang].
+  static String helpYoutubeUrlForLanguage(AppLanguage lang) => switch (lang) {
+    AppLanguage.arabic => helpYoutubeUrlAr,
+    AppLanguage.english => helpYoutubeUrlEn,
+    AppLanguage.urdu => helpYoutubeUrlUr,
+  };
 
   /// Opens [url] in the external browser or YouTube app.
   Future<bool> openExternalUrl(String url) async {
@@ -93,31 +103,6 @@ class MushafSystemService {
       await _channel.invokeMethod<bool>('cancelKhatmaReminder');
     } catch (_) {
       // Ignore in headless/test environments
-    }
-  }
-
-  /// Schedules a 5-second preview of the localized 24-hour Khatma reminder
-  /// notification so the user can test it immediately on their device.
-  Future<bool> triggerTestKhatmaReminder() async {
-    final title = tr(
-      'حان وقت وردك القرآني في مصحف الختمة 📖',
-      'Time for your Quran Khatma reading 📖',
-      'تلاوتِ قرآن اور ختمہ کا وقت 📖',
-    );
-    final body = tr(
-      'مرّت ٢٤ ساعة منذ آخر علامة في ختمتك. لا تحرم قلبك نور القرآن اليوم ولو بصفحة واحدة — ﴿فَاقْرَؤُوا مَا تَيَسَّرَ مِنَ الْقُرْآنِ﴾.',
-      '24 hours have passed since you last marked your Khatma progress. Illuminate your heart with the Quran today, even with a single page — "So recite what is easy for you of the Quran."',
-      'آپ کے ختمہ میں آخری نشان لگائے ٢٤ گھنٹے گزر چکے ہیں۔ آج اپنے دل کو قرآن کے نور سے منور کریں، چاہے ایک ہی صفحہ پڑھیں — ﴿فَاقْرَؤُوا مَا تَيَسَّرَ مِنَ الْقُرْآنِ﴾۔',
-    );
-    try {
-      final ok = await _channel.invokeMethod<bool>('testKhatmaReminder', {
-        'title': title,
-        'body': body,
-        'delaySeconds': 5,
-      });
-      return ok ?? false;
-    } catch (_) {
-      return false;
     }
   }
 

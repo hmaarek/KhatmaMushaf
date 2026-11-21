@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../l10n/l10n.dart';
+import '../services/database_service.dart';
 import '../utils/arabic_utils.dart';
 
 enum KhatmaStatus {
@@ -164,12 +165,20 @@ class KhatmaRecord {
   /// The previous known location before [currentMark], if any.
   KhatmaProgressEntry? get previousMark => logs.length > 1 ? logs[1] : null;
 
-  /// Completion ratio (0.0 .. 1.0) based on global Ayah index (out of 6,236).
+  /// Completion ratio (0.0 .. 1.0) based on actual Quranic Arabic characters (letters)
+  /// read out of total letters in the Holy Quran (~324,290), avoiding distortion
+  /// between long and short ayahs.
   double get progressRatio {
     if (isCompleted) return 1.0;
     final mark = currentMark;
     if (mark == null) return 0.0;
-    return (mark.ayahGlobalId / 6236.0).clamp(0.0, 1.0);
+    final db = DatabaseService.instance;
+    final totalLetters = db.totalQuranLetters;
+    if (totalLetters <= 0) {
+      return (mark.ayahGlobalId / 6236.0).clamp(0.0, 1.0);
+    }
+    final lettersRead = db.getCumulativeLettersUpToAyah(mark.ayahGlobalId);
+    return (lettersRead / totalLetters).clamp(0.0, 1.0);
   }
 
   int get reachedAyahsCount {

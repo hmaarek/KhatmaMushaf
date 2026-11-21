@@ -277,18 +277,20 @@ class KhatmaService {
     final avgPages = totalPagesReached / effectiveDays;
     final avgJuz = totalJuzReached / effectiveDays;
 
+    final int totalQuranLetters = DatabaseService.instance.totalQuranLetters;
     final int lettersRead = DatabaseService.instance
         .getCumulativeLettersUpToAyah(totalAyahsReached);
     final int estimatedHasanat = lettersRead * 10;
+    final double avgLettersPerDay = lettersRead / effectiveDays;
 
     int? estimatedRemainingDays;
     DateTime? estimatedCompletionDate;
     if (khatma.isCompleted) {
       estimatedRemainingDays = 0;
       estimatedCompletionDate = end;
-    } else if (totalAyahsReached > 0 && avgAyahs > 0) {
-      final remainingAyahs = math.max(6236 - totalAyahsReached, 0);
-      estimatedRemainingDays = (remainingAyahs / avgAyahs).ceil();
+    } else if (lettersRead > 0 && avgLettersPerDay > 0) {
+      final remainingLetters = math.max(totalQuranLetters - lettersRead, 0);
+      estimatedRemainingDays = (remainingLetters / avgLettersPerDay).ceil();
       estimatedCompletionDate = DateTime(
         now.year,
         now.month,

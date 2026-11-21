@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -48,16 +49,55 @@ class MushafPageWidget extends StatefulWidget {
 }
 
 class _MushafPageWidgetState extends State<MushafPageWidget> {
+  static const Duration _doubleTapWindow = Duration(milliseconds: 340);
+  static const Duration _singleTapHudDelay = Duration(milliseconds: 260);
+
   Future<MushafPageData>? _loadFuture;
   final List<GestureRecognizer> _recognizers = <GestureRecognizer>[];
   final TransformationController _zoomController = TransformationController();
   bool _isPinchZoomed = false;
+  Timer? _pendingHudToggleTimer;
+  String? _lastTappedWordLocation;
+  DateTime? _lastWordTapAt;
 
   @override
   void initState() {
     super.initState();
     _loadFuture = widget.controller.loadPageAndFont(widget.pageNumber);
     _zoomController.addListener(_onZoomMatrixChanged);
+  }
+
+  void _cancelPendingWordTap() {
+    _pendingHudToggleTimer?.cancel();
+    _pendingHudToggleTimer = null;
+    _lastTappedWordLocation = null;
+    _lastWordTapAt = null;
+  }
+
+  void _handleWordTapCandidate(LineWord word) {
+    final now = DateTime.now();
+    final isDoubleTap =
+        _lastTappedWordLocation == word.location &&
+        _lastWordTapAt != null &&
+        now.difference(_lastWordTapAt!) <= _doubleTapWindow;
+
+    _pendingHudToggleTimer?.cancel();
+    _pendingHudToggleTimer = null;
+
+    if (isDoubleTap) {
+      _lastTappedWordLocation = null;
+      _lastWordTapAt = null;
+      widget.onWordTap?.call(word);
+      return;
+    }
+
+    _lastTappedWordLocation = word.location;
+    _lastWordTapAt = now;
+    _pendingHudToggleTimer = Timer(_singleTapHudDelay, () {
+      _pendingHudToggleTimer = null;
+      if (!mounted) return;
+      widget.controller.toggleHud();
+    });
   }
 
   void _onZoomMatrixChanged() {
@@ -73,6 +113,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   void didUpdateWidget(covariant MushafPageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.pageNumber != widget.pageNumber) {
+      _cancelPendingWordTap();
       _disposeRecognizers();
       _zoomController.value = Matrix4.identity();
       _loadFuture = widget.controller.loadPageAndFont(widget.pageNumber);
@@ -94,6 +135,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   @override
   void dispose() {
+    _cancelPendingWordTap();
     _zoomController.removeListener(_onZoomMatrixChanged);
     _zoomController.dispose();
     _disposeRecognizers();
@@ -116,9 +158,13 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: widget.controller.toggleHud,
+          onTap: () {
+            _cancelPendingWordTap();
+            widget.controller.toggleHud();
+          },
           onDoubleTap: scaleMode == MushafFontScaleMode.pinchToZoom
               ? () {
+                  _cancelPendingWordTap();
                   final currentScale = _zoomController.value
                       .getMaxScaleOnAxis();
                   if (currentScale > 1.05) {
@@ -134,7 +180,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               : null,
           child: Container(
             color: theme.scaffoldBackground,
-            padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
+            padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.5),
             child: FutureBuilder<MushafPageData>(
               initialData: (cached != null && fontLoaded) ? cached : null,
               future: _loadFuture,
@@ -160,6 +206,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                     final isPinch =
                         scaleMode == MushafFontScaleMode.pinchToZoom;
                     final factor = isPinch ? 1.0 : scaleMode.scaleFactor;
+                    final heightFactor = isPinch
+                        ? 1.0
+                        : scaleMode.heightMultiplier;
 
                     // Inside the vertical list the parent already sized us.
                     if (widget.scrollEmbedded) {
@@ -168,6 +217,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         pageData,
                         theme,
                         fontScale: factor * boost,
+                        userFontScale: factor,
                       );
                       if (!isPinch) return frame;
                       return InteractiveViewer(
@@ -184,17 +234,34 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                       final pageHeight =
                           constraints.maxWidth *
                           MushafPageWidget.landscapePageAspect *
-                          factor;
-                      Widget page = SizedBox(
-                        width: constraints.maxWidth,
-                        height: pageHeight,
-                        child: _buildPageFrame(
-                          context,
-                          pageData,
-                          theme,
-                          fontScale: factor * boost,
-                        ),
-                      );
+                          heightFactor;
+                      Widget page = factor > 1.01 && !pageData.info.isCentered
+                          ? ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: constraints.maxWidth,
+                                maxWidth: constraints.maxWidth,
+                                minHeight: pageHeight,
+                              ),
+                              child: _buildPageFrame(
+                                context,
+                                pageData,
+                                theme,
+                                fontScale: factor * boost,
+                                userFontScale: factor,
+                                shrinkWrapHeight: true,
+                              ),
+                            )
+                          : SizedBox(
+                              width: constraints.maxWidth,
+                              height: pageHeight,
+                              child: _buildPageFrame(
+                                context,
+                                pageData,
+                                theme,
+                                fontScale: factor * boost,
+                                userFontScale: factor,
+                              ),
+                            );
                       if (isPinch) {
                         page = InteractiveViewer(
                           transformationController: _zoomController,
@@ -227,6 +294,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                             pageData,
                             theme,
                             fontScale: 1.0,
+                            userFontScale: 1.0,
                           ),
                         ),
                       );
@@ -238,10 +306,35 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         pageData,
                         theme,
                         fontScale: 1.0,
+                        userFontScale: 1.0,
                       );
                     }
 
-                    final enlargedHeight = constraints.maxHeight * factor;
+                    // Large / Extra-Large in portrait side-flip mode: reflow
+                    // verses at the genuinely enlarged font size inside a
+                    // smoothly scrollable page frame.
+                    if (!pageData.info.isCentered) {
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                            maxWidth: constraints.maxWidth,
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: _buildPageFrame(
+                            context,
+                            pageData,
+                            theme,
+                            fontScale: factor,
+                            userFontScale: factor,
+                            shrinkWrapHeight: true,
+                          ),
+                        ),
+                      );
+                    }
+
+                    final enlargedHeight = constraints.maxHeight * heightFactor;
                     return SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       child: SizedBox(
@@ -252,6 +345,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                           pageData,
                           theme,
                           fontScale: factor,
+                          userFontScale: factor,
                         ),
                       ),
                     );
@@ -305,9 +399,23 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     MushafPageData pageData,
     MushafThemeData theme, {
     required double fontScale,
+    required double userFontScale,
+    bool shrinkWrapHeight = false,
   }) {
     final info = pageData.info;
     final isBookmarked = widget.controller.isPageBookmarked(widget.pageNumber);
+    final useReflowEnlarged = userFontScale > 1.01 && !info.isCentered;
+
+    final Widget bodyWidget = info.isCentered
+        ? _buildCenteredSpecialPage(pageData, theme, fontScale: fontScale)
+        : useReflowEnlarged
+        ? _buildEnlargedReflowBody(
+            pageData,
+            theme,
+            userFontScale: userFontScale,
+            shrinkWrapHeight: shrinkWrapHeight,
+          )
+        : _buildStandard15LineBody(pageData, theme, fontScale: fontScale);
 
     return Stack(
       children: [
@@ -320,29 +428,24 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             isCenteredPage: info.isCentered,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(7.0, 6.0, 7.0, 6.0),
+            padding: const EdgeInsets.fromLTRB(5.0, 5.0, 5.0, 5.0),
             child: Column(
+              mainAxisSize: shrinkWrapHeight
+                  ? MainAxisSize.min
+                  : MainAxisSize.max,
               children: [
                 // Top running header inside Mushaf margin
                 _buildRunningHeader(info, theme),
                 const SizedBox(height: 2.0),
-                // Main Mushaf body: centered layout for Pages 1 & 2, 15-line layout for Pages 3-604
-                Expanded(
-                  child: info.isCentered
-                      ? _buildCenteredSpecialPage(
-                          pageData,
-                          theme,
-                          fontScale: fontScale,
-                        )
-                      : _buildStandard15LineBody(
-                          pageData,
-                          theme,
-                          fontScale: fontScale,
-                        ),
-                ),
-                // Special Khatma Completion button on the very last page of the Mushaf (Page 604, after Surah An-Nas Ayah 6)
+                // Main Mushaf body
+                if (shrinkWrapHeight)
+                  bodyWidget
+                else
+                  Expanded(child: bodyWidget),
+                // Special Khatma Completion button on the very last page of the Mushaf
+                // (Page 604, after Surah An-Nas Ayah 6) — shown ONLY when an active Khatma exists
                 if (info.pageNumber == 604 &&
-                    widget.controller.showLastPageKhatmaButton) ...[
+                    widget.controller.activeKhatma != null) ...[
                   const SizedBox(height: 4.0),
                   _buildLastPageKhatmaCompletionButton(theme),
                 ],
@@ -571,6 +674,63 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
+  Widget _buildAyahMarkerWidget({
+    required LineWord word,
+    required MushafThemeData theme,
+    required double fontSize,
+    required bool isSelectedAyah,
+    required bool isKhatmaMark,
+    required Color? baseBgColor,
+    required LineWord? longPressWord,
+  }) {
+    final Color ornamentColor = isKhatmaMark
+        ? const Color(0xFF1F7A53)
+        : theme.ornamentPrimary;
+    final Color secondaryOrnamentColor = isKhatmaMark
+        ? const Color(0xFF2B8A62)
+        : theme.ornamentSecondary;
+    final Color digitColor = isKhatmaMark
+        ? const Color(0xFF1F7A53)
+        : isSelectedAyah
+        ? theme.ornamentPrimary
+        : theme.glyphColor;
+
+    final ayahDigits = _toEasternArabicDigits(word.ayahNumber);
+    final isThreeDigits = word.ayahNumber >= 100;
+    final double markerWidth = fontSize * (isThreeDigits ? 0.90 : 0.78);
+    final double markerHeight = fontSize * 0.88;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onVerseMarkerTap != null
+          ? () {
+              _cancelPendingWordTap();
+              widget.onVerseMarkerTap!(word);
+            }
+          : null,
+      onLongPress: () {
+        _cancelPendingWordTap();
+        widget.controller.selectVerse(word.verseKey);
+        widget.onAyahLongPress(word.verseKey, longPressWord);
+      },
+      child: Container(
+        color: baseBgColor,
+        padding: EdgeInsets.symmetric(horizontal: fontSize * 0.045),
+        child: _AyahNumberOrnament(
+          digits: ayahDigits,
+          width: markerWidth,
+          height: markerHeight,
+          digitFontSize: fontSize * (isThreeDigits ? 0.36 : 0.43),
+          ornamentColor: ornamentColor,
+          secondaryOrnamentColor: secondaryOrnamentColor,
+          digitColor: digitColor,
+          isSelected: isSelectedAyah,
+          isDark: theme.isDark,
+        ),
+      ),
+    );
+  }
+
   List<InlineSpan> _buildWordSpans({
     required MushafPageLine line,
     required String fontFamily,
@@ -582,10 +742,11 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     final selectedVerse = widget.controller.selectedVerseKey;
     final playingAyahKey = widget.controller.playingAyahVerseKey;
     final selectedWordLoc = widget.controller.selectedWordLocation;
-    final singleTapEnabled = widget.controller.enableSingleTapWordPronunciation;
+    final doubleTapWordEnabled =
+        widget.controller.enableSingleTapWordPronunciation;
     final isIndoPak = widget.controller.isIndoPakScript;
     final effectiveFont = isIndoPak ? 'IndoPak' : fontFamily;
-    final effectiveWordSpacing = isIndoPak ? 1.5 : wordSpacing;
+    final effectiveWordSpacing = isIndoPak ? 1.0 : wordSpacing;
 
     final spans = <InlineSpan>[];
 
@@ -626,71 +787,54 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           : theme.glyphColor;
 
       if (word.isStandaloneVerseMarker) {
-        final markerRecognizer = _WordTapAndLongPressRecognizer(
-          onTap: widget.onVerseMarkerTap != null
-              ? () => widget.onVerseMarkerTap!(word)
-              : null,
-          onLongPress: () {
-            widget.controller.selectVerse(word.verseKey);
-            widget.onAyahLongPress(word.verseKey, null);
-          },
-        );
-        _recognizers.add(markerRecognizer);
-        final mText = isIndoPak
-            ? '\u06DD${_toEasternArabicDigits(word.ayahNumber)}'
-            : word.qpcV1;
-
         spans.add(
-          TextSpan(
-            text: isLastInLine ? mText : '$mText ',
-            recognizer: markerRecognizer,
-            style: TextStyle(
-              fontFamily: effectiveFont,
-              fontSize: fontSize * 1.18,
-              height: lineHeight,
-              wordSpacing: effectiveWordSpacing,
-              color: isSelectedAyah
-                  ? theme.ornamentPrimary
-                  : isKhatmaMark
-                  ? const Color(0xFF1F7A53)
-                  : theme.glyphColor,
-              backgroundColor: baseBgColor,
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: _buildAyahMarkerWidget(
+              word: word,
+              theme: theme,
+              fontSize: fontSize,
+              isSelectedAyah: isSelectedAyah,
+              isKhatmaMark: isKhatmaMark,
+              baseBgColor: baseBgColor,
+              longPressWord: null,
             ),
           ),
         );
+        if (!isLastInLine) {
+          spans.add(
+            TextSpan(
+              text: ' ',
+              style: TextStyle(
+                fontFamily: effectiveFont,
+                fontSize: fontSize * 0.65,
+                height: lineHeight,
+                wordSpacing: effectiveWordSpacing,
+                backgroundColor: baseBgColor,
+              ),
+            ),
+          );
+        }
       } else if (word.hasTrailingVerseMarker) {
         final wordPart = isIndoPak
             ? _toIndoPakWord(word.cleanWordUthmani)
             : word.wordOnlyQpcV1;
-        final markerPart = isIndoPak
-            ? '\u06DD${_toEasternArabicDigits(word.ayahNumber)}'
-            : word.verseMarkerQpcV1!;
 
         final wordRecognizer = _WordTapAndLongPressRecognizer(
-          onTap: singleTapEnabled && widget.onWordTap != null
-              ? () => widget.onWordTap!(word)
+          onTap: doubleTapWordEnabled && widget.onWordTap != null
+              ? () => _handleWordTapCandidate(word)
               : null,
           onLongPress: () {
+            _cancelPendingWordTap();
             widget.controller.selectVerse(word.verseKey);
             widget.onAyahLongPress(word.verseKey, word);
           },
         );
         _recognizers.add(wordRecognizer);
 
-        final markerRecognizer = _WordTapAndLongPressRecognizer(
-          onTap: widget.onVerseMarkerTap != null
-              ? () => widget.onVerseMarkerTap!(word)
-              : null,
-          onLongPress: () {
-            widget.controller.selectVerse(word.verseKey);
-            widget.onAyahLongPress(word.verseKey, word);
-          },
-        );
-        _recognizers.add(markerRecognizer);
-
         spans.add(
           TextSpan(
-            text: '$wordPart ',
+            text: wordPart,
             recognizer: wordRecognizer,
             style: TextStyle(
               fontFamily: effectiveFont,
@@ -704,29 +848,41 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         );
 
         spans.add(
-          TextSpan(
-            text: isLastInLine ? markerPart : '$markerPart ',
-            recognizer: markerRecognizer,
-            style: TextStyle(
-              fontFamily: effectiveFont,
-              fontSize: fontSize * 1.18,
-              height: lineHeight,
-              wordSpacing: effectiveWordSpacing,
-              color: isSelectedAyah
-                  ? theme.ornamentPrimary
-                  : isKhatmaMark
-                  ? const Color(0xFF1F7A53)
-                  : theme.glyphColor,
-              backgroundColor: baseBgColor,
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: _buildAyahMarkerWidget(
+              word: word,
+              theme: theme,
+              fontSize: fontSize,
+              isSelectedAyah: isSelectedAyah,
+              isKhatmaMark: isKhatmaMark,
+              baseBgColor: baseBgColor,
+              longPressWord: word,
             ),
           ),
         );
+
+        if (!isLastInLine) {
+          spans.add(
+            TextSpan(
+              text: ' ',
+              style: TextStyle(
+                fontFamily: effectiveFont,
+                fontSize: fontSize * 0.65,
+                height: lineHeight,
+                wordSpacing: effectiveWordSpacing,
+                backgroundColor: baseBgColor,
+              ),
+            ),
+          );
+        }
       } else {
         final wordRecognizer = _WordTapAndLongPressRecognizer(
-          onTap: singleTapEnabled && widget.onWordTap != null
-              ? () => widget.onWordTap!(word)
+          onTap: doubleTapWordEnabled && widget.onWordTap != null
+              ? () => _handleWordTapCandidate(word)
               : null,
           onLongPress: () {
+            _cancelPendingWordTap();
             widget.controller.selectVerse(word.verseKey);
             widget.onAyahLongPress(word.verseKey, word);
           },
@@ -837,6 +993,143 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
+  /// Enlarged reflow body used when the user selects Large (125%) or Extra Large (150%).
+  /// Instead of forcing every line onto 1 line inside `FittedBox` (which would shrink the
+  /// font back down to screen width and only add gaps between lines), this renders the
+  /// page's verses in flowing wrapped blocks at a genuinely enlarged glyph size while
+  /// preserving exact page boundaries, Surah headers, Basmalas, word-tap audio, and highlights.
+  Widget _buildEnlargedReflowBody(
+    MushafPageData pageData,
+    MushafThemeData theme, {
+    required double userFontScale,
+    required bool shrinkWrapHeight,
+  }) {
+    _disposeRecognizers();
+    final fontFamily = QpcFontLoaderService.fontFamilyForPage(
+      widget.pageNumber,
+    );
+    final isIndoPak = widget.controller.isIndoPakScript;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availWidth = (constraints.maxWidth - 10.0).clamp(180.0, 1400.0);
+        // Baseline visual glyph size at Standard (100%) on this screen width
+        final double baseVisualSize = isIndoPak
+            ? (availWidth * 0.059).clamp(19.0, 58.0)
+            : (availWidth * 0.068).clamp(22.0, 64.0);
+        final double targetFontSize = baseVisualSize * userFontScale;
+        final double lineHeight = isIndoPak ? 1.80 : 1.48;
+
+        final blocks = <Widget>[];
+        final pendingSpans = <InlineSpan>[];
+
+        void flushPendingText() {
+          if (pendingSpans.isEmpty) return;
+          final spansCopy = List<InlineSpan>.from(pendingSpans);
+          pendingSpans.clear();
+          blocks.add(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: RichText(
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.justify,
+                  softWrap: true,
+                  text: TextSpan(children: spansCopy),
+                ),
+              ),
+            ),
+          );
+        }
+
+        for (final line in pageData.lines) {
+          if (line.isSurahHeader) {
+            flushPendingText();
+            final sId = line.surahId ?? 1;
+            blocks.add(
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                child: SizedBox(
+                  height: (46.0 * userFontScale).clamp(46.0, 74.0),
+                  child: SurahHeaderBanner(
+                    surahId: sId,
+                    headerText: line.headerText ?? '',
+                    surahInfo: widget.controller.getSurahById(sId),
+                    theme: theme,
+                    compact: true,
+                  ),
+                ),
+              ),
+            );
+          } else if (line.isBasmala) {
+            flushPendingText();
+            blocks.add(
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: SizedBox(
+                  height: (36.0 * userFontScale).clamp(36.0, 58.0),
+                  child: _buildBasmalaLine(
+                    theme,
+                    fontSize: (28.0 * userFontScale).clamp(28.0, 52.0),
+                  ),
+                ),
+              ),
+            );
+          } else if (line.words.isNotEmpty) {
+            if (pendingSpans.isNotEmpty) {
+              pendingSpans.add(
+                TextSpan(
+                  text: ' ',
+                  style: TextStyle(
+                    fontFamily: isIndoPak ? 'IndoPak' : fontFamily,
+                    fontSize: targetFontSize,
+                    height: lineHeight,
+                  ),
+                ),
+              );
+            }
+            pendingSpans.addAll(
+              _buildWordSpans(
+                line: line,
+                fontFamily: fontFamily,
+                theme: theme,
+                fontSize: targetFontSize,
+                lineHeight: lineHeight,
+                wordSpacing: isIndoPak ? 1.5 : -1.0,
+              ),
+            );
+          }
+        }
+        flushPendingText();
+
+        final contentColumn = Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: blocks,
+          ),
+        );
+
+        if (shrinkWrapHeight) {
+          return contentColumn;
+        }
+
+        // Embedded inside fixed-height vertical scroll list: render at true
+        // enlarged font size, with a FittedBox(scaleDown) safety guard only if
+        // an unusually dense page would otherwise exceed the page box height.
+        return Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: SizedBox(width: constraints.maxWidth, child: contentColumn),
+          ),
+        );
+      },
+    );
+  }
+
   /// Pages 3–604 authentic 15-line Madinah Mushaf layout.
   Widget _buildStandard15LineBody(
     MushafPageData pageData,
@@ -849,7 +1142,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
+      padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 0.5),
       child: Column(
         children: pageData.lines
             .map((line) {
@@ -885,14 +1178,14 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       );
     }
     if (line.isBasmala) {
-      return _buildBasmalaLine(theme, fontSize: 27.0 * fontScale);
+      return _buildBasmalaLine(theme, fontSize: 30.0 * fontScale);
     }
     return _buildTextLine(
       line: line,
       fontFamily: fontFamily,
       theme: theme,
       centered: false,
-      baseFontSize: 33.5 * fontScale,
+      baseFontSize: 39.0 * fontScale,
     );
   }
 
@@ -926,8 +1219,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       fontFamily: fontFamily,
       theme: theme,
       fontSize: baseFontSize,
-      lineHeight: 1.05,
-      wordSpacing: -2.5,
+      lineHeight: 1.03,
+      wordSpacing: -3.6,
     );
 
     return SizedBox.expand(
@@ -1121,20 +1414,20 @@ class _MushafFramePainter extends CustomPainter {
       ..strokeWidth = 0.8;
 
     final outerRRect = RRect.fromRectAndRadius(
-      rect.deflate(1.5),
+      rect.deflate(1.0),
       const Radius.circular(8.0),
     );
     canvas.drawRRect(outerRRect, bgPaint);
     canvas.drawRRect(outerRRect, outerStroke);
 
     final innerRRect = RRect.fromRectAndRadius(
-      rect.deflate(4.5),
+      rect.deflate(3.5),
       const Radius.circular(5.0),
     );
     canvas.drawRRect(innerRRect, innerStroke);
 
     // Subtle corner floral/geometric accents
-    const cornerOffset = 7.5;
+    const cornerOffset = 6.5;
     final corners = [
       const Offset(cornerOffset, cornerOffset),
       Offset(size.width - cornerOffset, cornerOffset),
@@ -1573,4 +1866,213 @@ class _WordTapAndLongPressRecognizer extends PrimaryPointerGestureRecognizer {
 
   @override
   String get debugDescription => 'word tap and long press';
+}
+
+/// Compact ornamental Ayah end-marker medallion whose circle and surrounding
+/// Islamic rosette ornaments use the active theme's accent color while keeping
+/// the Eastern Arabic ayah number crisp and readable inside.
+class _AyahNumberOrnament extends StatelessWidget {
+  final String digits;
+  final double width;
+  final double height;
+  final double digitFontSize;
+  final Color ornamentColor;
+  final Color secondaryOrnamentColor;
+  final Color digitColor;
+  final bool isSelected;
+  final bool isDark;
+
+  const _AyahNumberOrnament({
+    required this.digits,
+    required this.width,
+    required this.height,
+    required this.digitFontSize,
+    required this.ornamentColor,
+    required this.secondaryOrnamentColor,
+    required this.digitColor,
+    required this.isSelected,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final innerW = width * 0.62;
+    final innerH = height * 0.56;
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: CustomPaint(
+        painter: _AyahOrnamentPainter(
+          primaryColor: ornamentColor,
+          secondaryColor: secondaryOrnamentColor,
+          isSelected: isSelected,
+          isDark: isDark,
+        ),
+        child: Center(
+          child: SizedBox(
+            width: innerW,
+            height: innerH,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                digits,
+                textDirection: TextDirection.ltr,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: digitFontSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1.0,
+                  color: digitColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AyahOrnamentPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+  final bool isSelected;
+  final bool isDark;
+
+  const _AyahOrnamentPainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.isSelected,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final rx = size.width / 2;
+    final ry = size.height / 2;
+    final minDim = math.min(size.width, size.height);
+
+    final innerRx = rx * 0.69;
+    final innerRy = ry * 0.65;
+
+    // 1. Subtle 8-petal scalloped rosette ring around the circle
+    final rosettePath = Path();
+    const petals = 8;
+    const steps = petals * 2;
+    for (int i = 0; i <= steps; i++) {
+      final angle = (i * math.pi) / petals - math.pi / 2;
+      final isTip = i.isEven;
+      final prx = isTip ? rx * 0.94 : rx * 0.78;
+      final pry = isTip ? ry * 0.87 : ry * 0.74;
+      final px = cx + prx * math.cos(angle);
+      final py = cy + pry * math.sin(angle);
+      if (i == 0) {
+        rosettePath.moveTo(px, py);
+      } else {
+        final prevAngle = ((i - 1) * math.pi) / petals - math.pi / 2;
+        final midAngle = (prevAngle + angle) / 2;
+        final ctrlRx = isTip ? rx * 0.88 : rx * 0.85;
+        final ctrlRy = isTip ? ry * 0.82 : ry * 0.80;
+        rosettePath.quadraticBezierTo(
+          cx + ctrlRx * math.cos(midAngle),
+          cy + ctrlRy * math.sin(midAngle),
+          px,
+          py,
+        );
+      }
+    }
+    rosettePath.close();
+
+    // Soft tinted fill on the outer ornamental band
+    canvas.drawPath(
+      rosettePath,
+      Paint()
+        ..color = secondaryColor.withValues(
+          alpha: isSelected ? 0.30 : (isDark ? 0.22 : 0.16),
+        )
+        ..style = PaintingStyle.fill,
+    );
+
+    // Scalloped outer ornament stroke in accent color
+    canvas.drawPath(
+      rosettePath,
+      Paint()
+        ..color = primaryColor.withValues(alpha: 0.92)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (minDim * 0.044).clamp(0.8, 1.7)
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // 2. Inner medallion circle fill & crisp accent ring
+    final innerRect = Rect.fromCenter(
+      center: Offset(cx, cy),
+      width: innerRx * 2,
+      height: innerRy * 2,
+    );
+    canvas.drawOval(
+      innerRect,
+      Paint()
+        ..color = primaryColor.withValues(
+          alpha: isSelected ? 0.24 : (isDark ? 0.14 : 0.08),
+        )
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawOval(
+      innerRect,
+      Paint()
+        ..color = primaryColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (minDim * 0.056).clamp(1.0, 2.1),
+    );
+
+    // 3. Classical Mushaf top & bottom crown finials (12 & 6 o'clock)
+    final finialPaint = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.fill;
+    final finialHalfW = (minDim * 0.095).clamp(1.3, 3.0);
+    final finialTipY = ry * 0.99;
+    final finialBaseY = ry * 0.84;
+
+    final topFinial = Path()
+      ..moveTo(cx, cy - finialTipY)
+      ..lineTo(cx + finialHalfW, cy - finialBaseY)
+      ..lineTo(cx, cy - finialBaseY + finialHalfW * 0.45)
+      ..lineTo(cx - finialHalfW, cy - finialBaseY)
+      ..close();
+    canvas.drawPath(topFinial, finialPaint);
+
+    final bottomFinial = Path()
+      ..moveTo(cx, cy + finialTipY)
+      ..lineTo(cx + finialHalfW, cy + finialBaseY)
+      ..lineTo(cx, cy + finialBaseY - finialHalfW * 0.45)
+      ..lineTo(cx - finialHalfW, cy + finialBaseY)
+      ..close();
+    canvas.drawPath(bottomFinial, finialPaint);
+
+    // 4. Delicate accent dots at the 4 diagonal axes (45°, 135°, 225°, 315°)
+    final dotRadius = (minDim * 0.036).clamp(0.7, 1.4);
+    final dotPaint = Paint()
+      ..color = primaryColor.withValues(alpha: 0.90)
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < 4; i++) {
+      final angle = (math.pi / 4) + (i * math.pi / 2);
+      final dx = cx + rx * 0.92 * math.cos(angle);
+      final dy = cy + ry * 0.86 * math.sin(angle);
+      canvas.drawCircle(Offset(dx, dy), dotRadius, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AyahOrnamentPainter oldDelegate) {
+    return oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.secondaryColor != secondaryColor ||
+        oldDelegate.isSelected != isSelected ||
+        oldDelegate.isDark != isDark;
+  }
 }

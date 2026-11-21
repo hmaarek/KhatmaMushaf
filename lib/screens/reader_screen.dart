@@ -128,6 +128,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'زبان منتخب کریں',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: theme.secondaryTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               content: Column(
@@ -140,6 +150,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   const SizedBox(height: 12),
                   langButton('English', AppLanguage.english, Icons.abc_rounded),
+                  const SizedBox(height: 12),
+                  langButton('اردو', AppLanguage.urdu, Icons.translate_rounded),
                 ],
               ),
             ),
@@ -421,8 +433,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 Expanded(
                   child: Text(
                     tr(
-                      tr('ميزة نطق الكلمات باللمس', 'Tap-to-Pronounce Words'),
-                      'Tap-to-pronounce words',
+                      'ميزة نطق الكلمات بالنقر المزدوج',
+                      'Double-Tap Word Pronunciation',
+                      'ڈبل ٹیپ پر لفظ کا تلفظ',
                     ),
                     style: TextStyle(
                       color: theme.glyphColor,
@@ -435,12 +448,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
             ),
             content: Text(
               tr(
-                'عند لمس أي كلمة في المصحف الشريف لمسة واحدة، سيقوم التطبيق بنطق الكلمة فوراً لمساعدتك على معرفة نطقها الصحيح أثناء القراءة.\n\n'
+                'عند النقر مرتين (نقر مزدوج) على أي كلمة في المصحف الشريف، سيقوم التطبيق بنطق الكلمة فوراً لمساعدتك على معرفة نطقها الصحيح أثناء القراءة.\n\n'
                     '• كما يمكنك لمس رقم الآية المزخرف ﴿١﴾ للاستماع إلى تلاوة الآية كاملة.\n'
-                    '• يمكنك في أي وقت تعديل هذه الميزة أو إيقاف اللمس الفردي أو تفعيل تلاوة الآية تلقائياً بعد الكلمة من خلال «الإعدادات».',
-                'Tap any word in the Holy Quran once and the app will pronounce it right away, helping you learn the correct pronunciation as you read.\n\n'
+                    '• يمكنك في أي وقت تعديل هذه الميزة أو إيقاف النقر المزدوج أو تفعيل تلاوة الآية تلقائياً بعد الكلمة من خلال «الإعدادات».',
+                'Double-tap any word in the Holy Quran and the app will pronounce it right away, helping you learn the correct pronunciation as you read.\n\n'
                     '• You can also tap the decorated ayah number ﴿1﴾ to hear the whole ayah recited.\n'
-                    '• At any time you can turn off single-tap pronunciation, or enable automatic ayah recitation after the word, from "Settings".',
+                    '• At any time you can turn off double-tap pronunciation, or enable automatic ayah recitation after the word, from "Settings".',
+                'قرآن کریم کے کسی بھی لفظ پر دو بار ٹیپ کرنے سے ایپ فوراً اس کا صحیح تلفظ سنائے گی۔\n\n'
+                    '• پوری آیت کی تلاوت سننے کے لیے آیت کے مزین نمبر ﴿١﴾ پر ٹیپ کریں۔\n'
+                    '• آپ کسی بھی وقت «ترتیبات» سے ڈبل ٹیپ تلفظ بند کر سکتے ہیں یا لفظ کے بعد خودکار تلاوت فعال کر سکتے ہیں۔',
               ),
               style: TextStyle(
                 color: theme.secondaryTextColor,
@@ -1712,12 +1728,12 @@ class _VerticalMushafScrollerState extends State<_VerticalMushafScroller> {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
         final mode = widget.controller.fontScaleMode;
-        final factor = mode == MushafFontScaleMode.pinchToZoom
+        final heightFactor = mode == MushafFontScaleMode.pinchToZoom
             ? 1.0
-            : mode.scaleFactor;
+            : mode.heightMultiplier;
         final extent = w > h
-            ? w * MushafPageWidget.landscapePageAspect * factor
-            : h * factor;
+            ? w * MushafPageWidget.landscapePageAspect * heightFactor
+            : h * heightFactor;
 
         final page = widget.controller.currentPage;
         if (_scroll == null) {

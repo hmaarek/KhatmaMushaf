@@ -70,27 +70,31 @@ enum MushafScrollMode {
 enum MushafFontScaleMode {
   standard(
     scaleFactor: 1.0,
+    heightMultiplier: 1.0,
     arabicTitle: 'قياسي (كامل الصفحة)',
     arabicSubtitle: 'عرض الـ ١٥ سطراً كاملة على الشاشة بدون تمرير',
     badgeText: '١٠٠٪',
     icon: Icons.fit_screen_rounded,
   ),
   large(
-    scaleFactor: 1.22,
+    scaleFactor: 1.24,
+    heightMultiplier: 1.55,
     arabicTitle: 'كبير',
-    arabicSubtitle: 'تكبير خط المصحف مع تمرير عمودي سلس للصفحة',
-    badgeText: '١٢٠٪',
+    arabicSubtitle: 'تكبير حقيقي لحجم خط المصحف مع تمرير عمودي سلس',
+    badgeText: '١٢٥٪',
     icon: Icons.text_increase_rounded,
   ),
   extraLarge(
-    scaleFactor: 1.45,
+    scaleFactor: 1.48,
+    heightMultiplier: 2.15,
     arabicTitle: 'كبير جداً',
-    arabicSubtitle: 'خط واضح وكبير جداً مع الحفاظ التام على الـ ١٥ سطراً',
-    badgeText: '١٤٥٪',
+    arabicSubtitle: 'خط كبير وواضح جداً مع الحفاظ على حدود كل صفحة',
+    badgeText: '١٥٠٪',
     icon: Icons.format_size_rounded,
   ),
   pinchToZoom(
     scaleFactor: 1.0,
+    heightMultiplier: 1.0,
     arabicTitle: 'تكبير حر باللمس (Pinch-to-Zoom)',
     arabicSubtitle: 'استخدم إصبعين لتكبير وتصغير الصفحة بحرية تامة',
     badgeText: 'حر  pinch',
@@ -110,9 +114,9 @@ enum MushafFontScaleMode {
     MushafFontScaleMode.standard =>
       'Shows all 15 lines on screen without scrolling',
     MushafFontScaleMode.large =>
-      'Larger Mushaf font with smooth vertical scrolling',
+      'Enlarged Mushaf font with smooth vertical scrolling',
     MushafFontScaleMode.extraLarge =>
-      'Very large, clear font while keeping all 15 lines',
+      'Extra-large, clear font while keeping each page boundary',
     MushafFontScaleMode.pinchToZoom =>
       'Use two fingers to zoom the page freely',
   });
@@ -129,6 +133,7 @@ enum MushafFontScaleMode {
   });
 
   final double scaleFactor;
+  final double heightMultiplier;
   final String arabicTitle;
   final String arabicSubtitle;
   final String badgeText;
@@ -136,6 +141,7 @@ enum MushafFontScaleMode {
 
   const MushafFontScaleMode({
     required this.scaleFactor,
+    required this.heightMultiplier,
     required this.arabicTitle,
     required this.arabicSubtitle,
     required this.badgeText,
@@ -227,24 +233,28 @@ class MushafController extends ChangeNotifier {
   MushafThemeData get theme => MushafThemeData.fromType(_themeType);
   MushafFontScaleMode get fontScaleMode => _fontScaleMode;
   bool get keepScreenAwake => _keepScreenAwake;
-  bool get showLastPageKhatmaButton => _showLastPageKhatmaButton;
+
+  /// Always enabled (shown on Page 604 only when an active Khatma exists).
+  bool get showLastPageKhatmaButton => true;
   bool get enableSingleTapWordPronunciation =>
       _enableSingleTapWordPronunciation;
   bool get hasShownSingleTapIntroDialog => _hasShownSingleTapIntroDialog;
   bool get autoPlayAyahAfterWord => _autoPlayAyahAfterWord;
-  bool get askKhatmaOnStartup => _askKhatmaOnStartup;
 
-  /// Active page scrolling mode (Side flip, Continuous vertical, or Vertical snap).
+  /// Always enabled: asks about Khatma on startup.
+  bool get askKhatmaOnStartup => true;
+
+  /// Active page scrolling mode (Side flip or Vertical scroll with snap).
   MushafScrollMode get scrollMode => _scrollMode;
 
-  /// True when either vertical scrolling mode (continuous or snap-to-edge) is active.
+  /// True when vertical scrolling is active.
   bool get verticalScroll => _scrollMode != MushafScrollMode.sideFlip;
 
-  /// True when vertical scrolling with snap-to-edge is active.
-  bool get verticalSnap => _scrollMode == MushafScrollMode.verticalSnap;
+  /// Snap-to-edge is always enabled whenever vertical scrolling is active.
+  bool get verticalSnap => verticalScroll;
 
-  /// True when the subtle haptic tick on page snap-to-edge is enabled.
-  bool get snapHapticEnabled => _snapHapticEnabled;
+  /// Subtle haptic tick on page snap-to-edge is always enabled.
+  bool get snapHapticEnabled => true;
 
   /// Rotate to a landscape (horizontal) layout when the phone is turned.
   bool get allowLandscape => _allowLandscape;
@@ -468,20 +478,16 @@ class MushafController extends ChangeNotifier {
 
   void setVerticalScroll(bool value) {
     setScrollMode(
-      value ? MushafScrollMode.verticalContinuous : MushafScrollMode.sideFlip,
+      value ? MushafScrollMode.verticalSnap : MushafScrollMode.sideFlip,
     );
   }
 
-  /// Opens the Help YouTube video in the external browser or YouTube app.
+  /// Opens the Help YouTube video matching the active app language
+  /// in the external browser or YouTube app.
   Future<bool> openHelpVideo() {
     return MushafSystemService.instance.openExternalUrl(
-      MushafSystemService.helpYoutubeUrl,
+      MushafSystemService.helpYoutubeUrlForLanguage(language),
     );
-  }
-
-  /// Schedules a 5-second test preview of the 24-hour Khatma reminder notification.
-  Future<bool> triggerTestKhatmaReminder() {
-    return MushafSystemService.instance.triggerTestKhatmaReminder();
   }
 
   void setAllowLandscape(bool value) {
@@ -503,9 +509,8 @@ class MushafController extends ChangeNotifier {
   }
 
   /// Fires a very gentle haptic tick (selectionClick) when a page snaps into
-  /// place, if [snapHapticEnabled] is true.
+  /// place (always enabled).
   void triggerSnapHaptic() {
-    if (!_snapHapticEnabled) return;
     final now = DateTime.now();
     if (_lastSnapHapticAt != null &&
         now.difference(_lastSnapHapticAt!).inMilliseconds < 250) {

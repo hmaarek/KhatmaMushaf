@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum MushafThemeType {
-  warmPaper,
-  crispWhite,
-  amoledDark,
-}
+enum MushafThemeType { warmPaper, crispWhite, amoledDark }
 
 class MushafThemeData {
   final MushafThemeType type;
@@ -53,23 +49,23 @@ class MushafThemeData {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// 1. Warm Mushaf Paper (Cream / Sepia) — authentic printed Madinah Mushaf feel
+  /// 1. Warm Mushaf Paper (Soft Ivory Cream) — authentic printed Madinah Mushaf feel
   static const MushafThemeData warmPaper = MushafThemeData(
     type: MushafThemeType.warmPaper,
     name: 'Warm Paper',
     arabicLabel: 'ورق المصحف',
     icon: Icons.auto_stories_rounded,
     brightness: Brightness.light,
-    scaffoldBackground: Color(0xFFF1E5CD),
-    pageBackground: Color(0xFFFAF2E1),
-    pageOuterBorder: Color(0xFFB5945B),
-    pageInnerBorder: Color(0xFFD6BE8F),
-    glyphColor: Color(0xFF1B140C),
-    secondaryTextColor: Color(0xFF6B532C),
-    ornamentPrimary: Color(0xFF8C672A),
-    ornamentSecondary: Color(0xFFC8A464),
-    ornamentFill: Color(0xFFF3E4C6),
-    ayahHighlightFill: Color(0x40D49B35),
+    scaffoldBackground: Color(0xFFFAF6EC),
+    pageBackground: Color(0xFFFAF6EC),
+    pageOuterBorder: Color(0xFFB5965E),
+    pageInnerBorder: Color(0xFFD8C49B),
+    glyphColor: Color(0xFF14110D),
+    secondaryTextColor: Color(0xFF7D653C),
+    ornamentPrimary: Color(0xFF9A783C),
+    ornamentSecondary: Color(0xFFCBB182),
+    ornamentFill: Color(0xFFF3EBDA),
+    ayahHighlightFill: Color(0x3CD49B35),
     ayahHighlightBorder: Color(0xFFB58025),
     hudBackground: Color(0xEB241B10),
     hudSurface: Color(0xFF352818),
@@ -84,7 +80,7 @@ class MushafThemeData {
     arabicLabel: 'أبيض ناصع',
     icon: Icons.wb_sunny_outlined,
     brightness: Brightness.light,
-    scaffoldBackground: Color(0xFFECEFF3),
+    scaffoldBackground: Color(0xFFFFFFFF),
     pageBackground: Color(0xFFFFFFFF),
     pageOuterBorder: Color(0xFF2B6E5E),
     pageInnerBorder: Color(0xFFA9C7BF),
@@ -136,9 +132,5 @@ class MushafThemeData {
     }
   }
 
-  static const List<MushafThemeData> all = [
-    warmPaper,
-    crispWhite,
-    amoledDark,
-  ];
+  static const List<MushafThemeData> all = [warmPaper, crispWhite, amoledDark];
 }

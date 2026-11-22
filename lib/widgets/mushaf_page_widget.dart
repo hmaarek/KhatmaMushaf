@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/mushaf_models.dart';
 import '../services/font_loader_service.dart';
+import '../services/qcf4_page_metrics.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
 import '../utils/arabic_utils.dart';
@@ -180,7 +181,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               : null,
           child: Container(
             color: theme.scaffoldBackground,
-            padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.5),
+            padding: EdgeInsets.zero,
             child: FutureBuilder<MushafPageData>(
               initialData: (cached != null && fontLoaded) ? cached : null,
               future: _loadFuture,
@@ -361,11 +362,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   Widget _buildLoadingSkeleton(MushafThemeData theme) {
     return Container(
-      decoration: BoxDecoration(
-        color: theme.pageBackground,
-        borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: theme.pageOuterBorder, width: 1.5),
-      ),
+      color: theme.pageBackground,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -415,47 +412,70 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             userFontScale: userFontScale,
             shrinkWrapHeight: shrinkWrapHeight,
           )
-        : _buildStandard15LineBody(pageData, theme, fontScale: fontScale);
+        : _buildStandard15LineBody(pageData, theme, fontScale: userFontScale);
+
+    final bool showBorder = info.isCentered || widget.controller.showPageBorder;
+
+    final Widget pageContent = Padding(
+      padding: info.isCentered
+          ? const EdgeInsets.fromLTRB(5.0, 5.0, 5.0, 5.0)
+          : showBorder
+          ? const EdgeInsets.fromLTRB(10.0, 6.0, 10.0, 6.0)
+          : const EdgeInsets.fromLTRB(10.0, 4.0, 10.0, 4.0),
+      child: Column(
+        mainAxisSize: shrinkWrapHeight ? MainAxisSize.min : MainAxisSize.max,
+        children: [
+          // Top running header inside Mushaf margin
+          _buildRunningHeader(info, theme),
+          const SizedBox(height: 2.0),
+          // Main Mushaf body
+          if (shrinkWrapHeight) bodyWidget else Expanded(child: bodyWidget),
+          // Special Khatma Completion button on the very last page of the Mushaf
+          // (Page 604, after Surah An-Nas Ayah 6) — shown ONLY when an active Khatma exists
+          if (info.pageNumber == 604 &&
+              widget.controller.activeKhatma != null) ...[
+            const SizedBox(height: 4.0),
+            _buildLastPageKhatmaCompletionButton(theme),
+          ],
+          const SizedBox(height: 2.0),
+          // Bottom page number in ornamental cartouche
+          _buildFooterPageNumber(info.pageNumber, theme),
+        ],
+      ),
+    );
+
+    final Widget framedOrBorderless = showBorder
+        ? Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
+            child: CustomPaint(
+              painter: _MushafFramePainter(
+                pageBackground: theme.pageBackground,
+                outerBorder: theme.pageOuterBorder,
+                innerBorder: theme.pageInnerBorder,
+                ornamentFill: theme.ornamentFill,
+                isCenteredPage: info.isCentered,
+              ),
+              child: pageContent,
+            ),
+          )
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.pageBackground,
+              border: widget.scrollEmbedded
+                  ? Border(
+                      bottom: BorderSide(
+                        color: theme.pageInnerBorder.withValues(alpha: 0.40),
+                        width: 0.8,
+                      ),
+                    )
+                  : null,
+            ),
+            child: pageContent,
+          );
 
     return Stack(
       children: [
-        CustomPaint(
-          painter: _MushafFramePainter(
-            pageBackground: theme.pageBackground,
-            outerBorder: theme.pageOuterBorder,
-            innerBorder: theme.pageInnerBorder,
-            ornamentFill: theme.ornamentFill,
-            isCenteredPage: info.isCentered,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(5.0, 5.0, 5.0, 5.0),
-            child: Column(
-              mainAxisSize: shrinkWrapHeight
-                  ? MainAxisSize.min
-                  : MainAxisSize.max,
-              children: [
-                // Top running header inside Mushaf margin
-                _buildRunningHeader(info, theme),
-                const SizedBox(height: 2.0),
-                // Main Mushaf body
-                if (shrinkWrapHeight)
-                  bodyWidget
-                else
-                  Expanded(child: bodyWidget),
-                // Special Khatma Completion button on the very last page of the Mushaf
-                // (Page 604, after Surah An-Nas Ayah 6) — shown ONLY when an active Khatma exists
-                if (info.pageNumber == 604 &&
-                    widget.controller.activeKhatma != null) ...[
-                  const SizedBox(height: 4.0),
-                  _buildLastPageKhatmaCompletionButton(theme),
-                ],
-                const SizedBox(height: 2.0),
-                // Bottom page number in ornamental cartouche
-                _buildFooterPageNumber(info.pageNumber, theme),
-              ],
-            ),
-          ),
-        ),
+        framedOrBorderless,
         // Subtle bookmark ribbon at top-left of page when page is bookmarked
         if (isBookmarked)
           Positioned(
@@ -658,17 +678,23 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   }
 
   Widget _buildCircularBasmalaLine(MushafThemeData theme) {
+    final quranWeight = widget.controller.boldQuranFont
+        ? FontWeight.w700
+        : FontWeight.w400;
     return FittedBox(
       fit: BoxFit.fitWidth,
       alignment: Alignment.center,
-      child: Text(
-        '\uE000',
+      child: RichText(
         textDirection: TextDirection.ltr,
-        style: TextStyle(
-          fontFamily: 'QPC1BSML',
-          fontSize: 40.0,
-          height: 1.05,
-          color: theme.glyphColor,
+        text: TextSpan(
+          text: '\uE000',
+          style: TextStyle(
+            fontFamily: 'QPC1BSML',
+            fontSize: 40.0,
+            fontWeight: quranWeight,
+            height: 1.05,
+            color: theme.glyphColor,
+          ),
         ),
       ),
     );
@@ -697,8 +723,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
     final ayahDigits = _toEasternArabicDigits(word.ayahNumber);
     final isThreeDigits = word.ayahNumber >= 100;
-    final double markerWidth = fontSize * (isThreeDigits ? 0.90 : 0.78);
-    final double markerHeight = fontSize * 0.88;
+    final double markerWidth = fontSize * (isThreeDigits ? 1.24 : 1.12);
+    final double markerHeight = fontSize * 1.28;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -715,12 +741,12 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       },
       child: Container(
         color: baseBgColor,
-        padding: EdgeInsets.symmetric(horizontal: fontSize * 0.045),
+        padding: EdgeInsets.symmetric(horizontal: fontSize * 0.035),
         child: _AyahNumberOrnament(
           digits: ayahDigits,
           width: markerWidth,
           height: markerHeight,
-          digitFontSize: fontSize * (isThreeDigits ? 0.36 : 0.43),
+          digitFontSize: fontSize * (isThreeDigits ? 0.37 : 0.44),
           ornamentColor: ornamentColor,
           secondaryOrnamentColor: secondaryOrnamentColor,
           digitColor: digitColor,
@@ -738,6 +764,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     required double fontSize,
     required double lineHeight,
     required double wordSpacing,
+    bool allowLineBreakBetweenWords = false,
   }) {
     final selectedVerse = widget.controller.selectedVerseKey;
     final playingAyahKey = widget.controller.playingAyahVerseKey;
@@ -747,8 +774,19 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     final isIndoPak = widget.controller.isIndoPakScript;
     final effectiveFont = isIndoPak ? 'IndoPak' : fontFamily;
     final effectiveWordSpacing = isIndoPak ? 1.0 : wordSpacing;
+    final quranWeight = widget.controller.boldQuranFont
+        ? FontWeight.w700
+        : FontWeight.w400;
 
     final spans = <InlineSpan>[];
+
+    void addQcfBreakOpportunity() {
+      if (!isIndoPak && allowLineBreakBetweenWords) {
+        spans.add(
+          const TextSpan(text: '\u200B', style: TextStyle(fontSize: 1.0)),
+        );
+      }
+    }
 
     for (int i = 0; i < line.words.length; i++) {
       final word = line.words[i];
@@ -802,18 +840,53 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           ),
         );
         if (!isLastInLine) {
-          spans.add(
-            TextSpan(
-              text: ' ',
-              style: TextStyle(
-                fontFamily: effectiveFont,
-                fontSize: fontSize * 0.65,
-                height: lineHeight,
-                wordSpacing: effectiveWordSpacing,
-                backgroundColor: baseBgColor,
+          if (isIndoPak) {
+            spans.add(
+              TextSpan(
+                text: ' ',
+                style: TextStyle(
+                  fontFamily: effectiveFont,
+                  fontSize: fontSize * 0.65,
+                  height: lineHeight,
+                  wordSpacing: effectiveWordSpacing,
+                  backgroundColor: baseBgColor,
+                ),
               ),
+            );
+          } else {
+            addQcfBreakOpportunity();
+          }
+        }
+      } else if (word.isOrnamentMark) {
+        final markRecognizer = _WordTapAndLongPressRecognizer(
+          onTap: null,
+          onLongPress: () {
+            _cancelPendingWordTap();
+            widget.controller.selectVerse(word.verseKey);
+            widget.onAyahLongPress(word.verseKey, null);
+          },
+        );
+        _recognizers.add(markRecognizer);
+        final markText = isIndoPak ? word.wordUthmani.trim() : word.qpcV1;
+        spans.add(
+          TextSpan(
+            text: (isIndoPak && !isLastInLine) ? '$markText ' : markText,
+            recognizer: markRecognizer,
+            style: TextStyle(
+              fontFamily: effectiveFont,
+              fontSize: fontSize,
+              height: lineHeight,
+              leadingDistribution: TextLeadingDistribution.even,
+              wordSpacing: effectiveWordSpacing,
+              color: isKhatmaMark
+                  ? const Color(0xFF1F7A53)
+                  : theme.ornamentPrimary,
+              backgroundColor: baseBgColor,
             ),
-          );
+          ),
+        );
+        if (!isLastInLine) {
+          addQcfBreakOpportunity();
         }
       } else if (word.hasTrailingVerseMarker) {
         final wordPart = isIndoPak
@@ -839,7 +912,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
             style: TextStyle(
               fontFamily: effectiveFont,
               fontSize: fontSize,
+              fontWeight: quranWeight,
               height: lineHeight,
+              leadingDistribution: TextLeadingDistribution.even,
               wordSpacing: effectiveWordSpacing,
               color: wordTextColor,
               backgroundColor: isSelectedWord ? wordBgColor : baseBgColor,
@@ -863,18 +938,22 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         );
 
         if (!isLastInLine) {
-          spans.add(
-            TextSpan(
-              text: ' ',
-              style: TextStyle(
-                fontFamily: effectiveFont,
-                fontSize: fontSize * 0.65,
-                height: lineHeight,
-                wordSpacing: effectiveWordSpacing,
-                backgroundColor: baseBgColor,
+          if (isIndoPak) {
+            spans.add(
+              TextSpan(
+                text: ' ',
+                style: TextStyle(
+                  fontFamily: effectiveFont,
+                  fontSize: fontSize * 0.65,
+                  height: lineHeight,
+                  wordSpacing: effectiveWordSpacing,
+                  backgroundColor: baseBgColor,
+                ),
               ),
-            ),
-          );
+            );
+          } else {
+            addQcfBreakOpportunity();
+          }
         }
       } else {
         final wordRecognizer = _WordTapAndLongPressRecognizer(
@@ -894,22 +973,168 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
         spans.add(
           TextSpan(
-            text: isLastInLine ? wText : '$wText ',
+            text: (isIndoPak && !isLastInLine) ? '$wText ' : wText,
             recognizer: wordRecognizer,
             style: TextStyle(
               fontFamily: effectiveFont,
               fontSize: fontSize,
+              fontWeight: quranWeight,
               height: lineHeight,
+              leadingDistribution: TextLeadingDistribution.even,
               wordSpacing: effectiveWordSpacing,
               color: wordTextColor,
               backgroundColor: isSelectedWord ? wordBgColor : baseBgColor,
             ),
           ),
         );
+        if (!isLastInLine) {
+          addQcfBreakOpportunity();
+        }
       }
     }
 
     return spans;
+  }
+
+  /// Builds per-word widgets for QCF4 (1441H) pages so Flutter lays out
+  /// Private-Use-Area glyphs strictly Right-to-Left via RTL [Row] / [Wrap]
+  /// (avoiding Unicode BiDi treating PUA codepoints as LTR runs).
+  List<Widget> _buildQcf4WordWidgets({
+    required MushafPageLine line,
+    required String fontFamily,
+    required MushafThemeData theme,
+    required double fontSize,
+    required double lineHeight,
+  }) {
+    final selectedVerse = widget.controller.selectedVerseKey;
+    final playingAyahKey = widget.controller.playingAyahVerseKey;
+    final selectedWordLoc = widget.controller.selectedWordLocation;
+    final doubleTapWordEnabled =
+        widget.controller.enableSingleTapWordPronunciation;
+    final quranWeight = widget.controller.boldQuranFont
+        ? FontWeight.w700
+        : FontWeight.w400;
+
+    final widgets = <Widget>[];
+
+    for (final word in line.words) {
+      final isSelectedAyah =
+          selectedVerse == word.verseKey || playingAyahKey == word.verseKey;
+      final isSelectedWord = selectedWordLoc == word.location;
+      final isKhatmaMark = widget.controller.isKhatmaCurrentVerse(
+        word.verseKey,
+      );
+      final isBookmarkedAyah = widget.controller.isAyahBookmarked(
+        word.verseKey,
+      );
+
+      Color? baseBgColor;
+      if (isSelectedAyah) {
+        baseBgColor = theme.ayahHighlightFill;
+      } else if (isKhatmaMark) {
+        baseBgColor = const Color(0x3D2B8A62);
+      } else if (isBookmarkedAyah) {
+        baseBgColor = widget.controller.savedAyahHighlightColor.withValues(
+          alpha: 0.28,
+        );
+      }
+
+      final Color? wordBgColor = isSelectedWord
+          ? theme.ornamentPrimary.withValues(alpha: 0.30)
+          : baseBgColor;
+
+      final Color wordTextColor = isSelectedWord
+          ? theme.ornamentPrimary
+          : isSelectedAyah
+          ? theme.ornamentPrimary
+          : isKhatmaMark
+          ? const Color(0xFF1F7A53)
+          : theme.glyphColor;
+
+      if (word.isStandaloneVerseMarker) {
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.only(top: fontSize * 0.05),
+            child: _buildAyahMarkerWidget(
+              word: word,
+              theme: theme,
+              fontSize: fontSize,
+              isSelectedAyah: isSelectedAyah,
+              isKhatmaMark: isKhatmaMark,
+              baseBgColor: baseBgColor,
+              longPressWord: null,
+            ),
+          ),
+        );
+      } else if (word.isOrnamentMark) {
+        widgets.add(
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: () {
+              _cancelPendingWordTap();
+              widget.controller.selectVerse(word.verseKey);
+              widget.onAyahLongPress(word.verseKey, null);
+            },
+            child: ColoredBox(
+              color: baseBgColor ?? Colors.transparent,
+              child: RichText(
+                textDirection: TextDirection.ltr,
+                maxLines: 1,
+                softWrap: false,
+                text: TextSpan(
+                  text: word.qpcV1,
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: fontSize,
+                    fontWeight: quranWeight,
+                    height: lineHeight,
+                    leadingDistribution: TextLeadingDistribution.even,
+                    color: isKhatmaMark
+                        ? const Color(0xFF1F7A53)
+                        : theme.ornamentPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      } else {
+        widgets.add(
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: doubleTapWordEnabled && widget.onWordTap != null
+                ? () => _handleWordTapCandidate(word)
+                : null,
+            onLongPress: () {
+              _cancelPendingWordTap();
+              widget.controller.selectVerse(word.verseKey);
+              widget.onAyahLongPress(word.verseKey, word);
+            },
+            child: ColoredBox(
+              color: wordBgColor ?? Colors.transparent,
+              child: RichText(
+                textDirection: TextDirection.ltr,
+                maxLines: 1,
+                softWrap: false,
+                text: TextSpan(
+                  text: word.qpcV1,
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: fontSize,
+                    fontWeight: quranWeight,
+                    height: lineHeight,
+                    leadingDistribution: TextLeadingDistribution.even,
+                    color: wordTextColor,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return widgets;
   }
 
   Widget _buildCircularTextLine({
@@ -917,13 +1142,37 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     required String fontFamily,
     required MushafThemeData theme,
   }) {
+    final isIndoPak = widget.controller.isIndoPakScript;
+
+    if (!isIndoPak) {
+      final wordWidgets = _buildQcf4WordWidgets(
+        line: line,
+        fontFamily: fontFamily,
+        theme: theme,
+        fontSize: 34.0,
+        lineHeight: 1.55,
+      );
+      return FittedBox(
+        fit: BoxFit.fitWidth,
+        alignment: Alignment.center,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: wordWidgets,
+          ),
+        ),
+      );
+    }
+
     final spans = _buildWordSpans(
       line: line,
       fontFamily: fontFamily,
       theme: theme,
-      fontSize: 42.0,
-      lineHeight: 1.12,
-      wordSpacing: -2.0,
+      fontSize: 34.0,
+      lineHeight: 1.55,
+      wordSpacing: 0.0,
     );
 
     return FittedBox(
@@ -1012,18 +1261,42 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availWidth = (constraints.maxWidth - 10.0).clamp(180.0, 1400.0);
-        // Baseline visual glyph size at Standard (100%) on this screen width
+        final availWidth = (constraints.maxWidth - 8.0).clamp(180.0, 1400.0);
+        // Baseline visual glyph size matching Standard (100%) on this screen width
         final double baseVisualSize = isIndoPak
-            ? (availWidth * 0.059).clamp(19.0, 58.0)
-            : (availWidth * 0.068).clamp(22.0, 64.0);
+            ? (availWidth / 15.0).clamp(18.0, 52.0)
+            : (availWidth / 16.30).clamp(18.0, 56.0);
         final double targetFontSize = baseVisualSize * userFontScale;
-        final double lineHeight = isIndoPak ? 1.80 : 1.48;
+        final double lineHeight = isIndoPak ? 1.85 : 1.82;
 
         final blocks = <Widget>[];
         final pendingSpans = <InlineSpan>[];
+        final pendingQcfWidgets = <Widget>[];
 
         void flushPendingText() {
+          if (!isIndoPak) {
+            if (pendingQcfWidgets.isEmpty) return;
+            final widgetsCopy = List<Widget>.from(pendingQcfWidgets);
+            pendingQcfWidgets.clear();
+            blocks.add(
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Wrap(
+                    direction: Axis.horizontal,
+                    textDirection: TextDirection.rtl,
+                    alignment: WrapAlignment.start,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 0.0,
+                    runSpacing: 2.0,
+                    children: widgetsCopy,
+                  ),
+                ),
+              ),
+            );
+            return;
+          }
           if (pendingSpans.isEmpty) return;
           final spansCopy = List<InlineSpan>.from(pendingSpans);
           pendingSpans.clear();
@@ -1077,34 +1350,47 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               ),
             );
           } else if (line.words.isNotEmpty) {
-            if (pendingSpans.isNotEmpty) {
-              pendingSpans.add(
-                TextSpan(
-                  text: ' ',
-                  style: TextStyle(
-                    fontFamily: isIndoPak ? 'IndoPak' : fontFamily,
-                    fontSize: targetFontSize,
-                    height: lineHeight,
+            if (!isIndoPak) {
+              pendingQcfWidgets.addAll(
+                _buildQcf4WordWidgets(
+                  line: line,
+                  fontFamily: fontFamily,
+                  theme: theme,
+                  fontSize: targetFontSize,
+                  lineHeight: lineHeight,
+                ),
+              );
+            } else {
+              if (pendingSpans.isNotEmpty) {
+                pendingSpans.add(
+                  TextSpan(
+                    text: ' ',
+                    style: TextStyle(
+                      fontFamily: 'IndoPak',
+                      fontSize: targetFontSize,
+                      height: lineHeight,
+                    ),
                   ),
+                );
+              }
+              pendingSpans.addAll(
+                _buildWordSpans(
+                  line: line,
+                  fontFamily: fontFamily,
+                  theme: theme,
+                  fontSize: targetFontSize,
+                  lineHeight: lineHeight,
+                  wordSpacing: 1.5,
+                  allowLineBreakBetweenWords: true,
                 ),
               );
             }
-            pendingSpans.addAll(
-              _buildWordSpans(
-                line: line,
-                fontFamily: fontFamily,
-                theme: theme,
-                fontSize: targetFontSize,
-                lineHeight: lineHeight,
-                wordSpacing: isIndoPak ? 1.5 : -1.0,
-              ),
-            );
           }
         }
         flushPendingText();
 
         final contentColumn = Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
+          padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 6.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1130,7 +1416,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
 
-  /// Pages 3–604 authentic 15-line Madinah Mushaf layout.
+  /// Pages 3–604 authentic 15-line Madinah Mushaf (1441H QCF4) layout with
+  /// one uniform printed-book font size across all 15 lines of the page.
   Widget _buildStandard15LineBody(
     MushafPageData pageData,
     MushafThemeData theme, {
@@ -1140,24 +1427,49 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     final fontFamily = QpcFontLoaderService.fontFamilyForPage(
       widget.pageNumber,
     );
+    final isIndoPak = widget.controller.isIndoPakScript;
+    final targetEm = qcf4TargetLineEmForPage(widget.pageNumber);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 0.5),
-      child: Column(
-        children: pageData.lines
-            .map((line) {
-              return Expanded(
-                flex: line.isSurahHeader ? 13 : 10,
-                child: _buildStandardLineSlot(
-                  line,
-                  fontFamily,
-                  theme,
-                  fontScale: fontScale,
-                ),
-              );
-            })
-            .toList(growable: false),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availWidth = constraints.maxWidth.clamp(180.0, 1400.0);
+        final availHeight = constraints.maxHeight.clamp(240.0, 3000.0);
+        final totalFlex = pageData.lines.fold<int>(
+          0,
+          (sum, line) => sum + (line.isSurahHeader ? 13 : 10),
+        );
+        final slotHeight = totalFlex > 0
+            ? availHeight * (10.0 / totalFlex)
+            : availHeight / 15.0;
+
+        // Compute one uniform font size for every line on this page so all 15
+        // lines share identical stroke weight and visual rhythm.
+        final double uniformFontSize;
+        if (isIndoPak) {
+          uniformFontSize = (availWidth / 14.5).clamp(18.0, 42.0) * fontScale;
+        } else {
+          final widthFont = availWidth / (targetEm + 0.20);
+          final heightFont = slotHeight / 1.56;
+          uniformFontSize = math.min(widthFont, heightFont) * fontScale;
+        }
+
+        return Column(
+          children: pageData.lines
+              .map((line) {
+                return Expanded(
+                  flex: line.isSurahHeader ? 13 : 10,
+                  child: _buildStandardLineSlot(
+                    line,
+                    fontFamily,
+                    theme,
+                    uniformFontSize: uniformFontSize,
+                    fontScale: fontScale,
+                  ),
+                );
+              })
+              .toList(growable: false),
+        );
+      },
     );
   }
 
@@ -1165,6 +1477,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     MushafPageLine line,
     String fontFamily,
     MushafThemeData theme, {
+    required double uniformFontSize,
     required double fontScale,
   }) {
     if (line.isSurahHeader) {
@@ -1178,29 +1491,38 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       );
     }
     if (line.isBasmala) {
-      return _buildBasmalaLine(theme, fontSize: 30.0 * fontScale);
+      return _buildBasmalaLine(
+        theme,
+        fontSize: (uniformFontSize * 1.25).clamp(24.0, 56.0),
+      );
     }
     return _buildTextLine(
       line: line,
       fontFamily: fontFamily,
       theme: theme,
       centered: false,
-      baseFontSize: 39.0 * fontScale,
+      baseFontSize: uniformFontSize,
     );
   }
 
   Widget _buildBasmalaLine(MushafThemeData theme, {required double fontSize}) {
+    final quranWeight = widget.controller.boldQuranFont
+        ? FontWeight.w700
+        : FontWeight.w400;
     return Center(
       child: FittedBox(
         fit: BoxFit.scaleDown,
-        child: Text(
-          '\uE000',
+        child: RichText(
           textDirection: TextDirection.ltr,
-          style: TextStyle(
-            fontFamily: 'QPC1BSML',
-            fontSize: fontSize,
-            height: 1.0,
-            color: theme.glyphColor,
+          text: TextSpan(
+            text: '\uE000',
+            style: TextStyle(
+              fontFamily: 'QPC1BSML',
+              fontSize: fontSize,
+              fontWeight: quranWeight,
+              height: 1.0,
+              color: theme.glyphColor,
+            ),
           ),
         ),
       ),
@@ -1214,13 +1536,42 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     required bool centered,
     required double baseFontSize,
   }) {
+    final isIndoPak = widget.controller.isIndoPakScript;
+
+    if (!isIndoPak) {
+      final wordWidgets = _buildQcf4WordWidgets(
+        line: line,
+        fontFamily: fontFamily,
+        theme: theme,
+        fontSize: baseFontSize,
+        lineHeight: 1.52,
+      );
+      return SizedBox.expand(
+        child: Align(
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: wordWidgets,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final spans = _buildWordSpans(
       line: line,
       fontFamily: fontFamily,
       theme: theme,
       fontSize: baseFontSize,
-      lineHeight: 1.03,
-      wordSpacing: -3.6,
+      lineHeight: 1.15,
+      wordSpacing: 0.0,
     );
 
     return SizedBox.expand(
@@ -1896,8 +2247,9 @@ class _AyahNumberOrnament extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final innerW = width * 0.62;
-    final innerH = height * 0.56;
+    // Keep digits comfortably inset inside the inner double-ring medallion
+    final innerW = width * 0.48;
+    final innerH = height * 0.44;
 
     return SizedBox(
       width: width,
@@ -1916,15 +2268,17 @@ class _AyahNumberOrnament extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.center,
-              child: Text(
-                digits,
+              child: RichText(
                 textDirection: TextDirection.ltr,
                 maxLines: 1,
-                style: TextStyle(
-                  fontSize: digitFontSize,
-                  fontWeight: FontWeight.w700,
-                  height: 1.0,
-                  color: digitColor,
+                text: TextSpan(
+                  text: digits,
+                  style: TextStyle(
+                    fontSize: digitFontSize,
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
+                    color: digitColor,
+                  ),
                 ),
               ),
             ),
@@ -1958,58 +2312,83 @@ class _AyahOrnamentPainter extends CustomPainter {
     final ry = size.height / 2;
     final minDim = math.min(size.width, size.height);
 
-    final innerRx = rx * 0.69;
-    final innerRy = ry * 0.65;
+    // Proportions for an authentic Madinah Mushaf 12-petal Shamsa rosette
+    final innerRx = rx * 0.65;
+    final innerRy = ry * 0.60;
 
-    // 1. Subtle 8-petal scalloped rosette ring around the circle
+    // 1. Delicate 12-petal scalloped lotus rosette outer silhouette
     final rosettePath = Path();
-    const petals = 8;
-    const steps = petals * 2;
-    for (int i = 0; i <= steps; i++) {
-      final angle = (i * math.pi) / petals - math.pi / 2;
-      final isTip = i.isEven;
-      final prx = isTip ? rx * 0.94 : rx * 0.78;
-      final pry = isTip ? ry * 0.87 : ry * 0.74;
-      final px = cx + prx * math.cos(angle);
-      final py = cy + pry * math.sin(angle);
+    const petals = 12;
+    final petalOuterRx = rx * 0.90;
+    final petalOuterRy = ry * 0.80;
+    final petalValleyRx = rx * 0.77;
+    final petalValleyRy = ry * 0.69;
+
+    for (int i = 0; i < petals; i++) {
+      final a0 = (i * 2 * math.pi) / petals - math.pi / 2;
+      final aMid = ((i + 0.5) * 2 * math.pi) / petals - math.pi / 2;
+      final a1 = ((i + 1) * 2 * math.pi) / petals - math.pi / 2;
+
+      final sx = cx + petalValleyRx * math.cos(a0);
+      final sy = cy + petalValleyRy * math.sin(a0);
+      final ctrlX = cx + (petalOuterRx * 1.06) * math.cos(aMid);
+      final ctrlY = cy + (petalOuterRy * 1.06) * math.sin(aMid);
+      final ex = cx + petalValleyRx * math.cos(a1);
+      final ey = cy + petalValleyRy * math.sin(a1);
+
       if (i == 0) {
-        rosettePath.moveTo(px, py);
-      } else {
-        final prevAngle = ((i - 1) * math.pi) / petals - math.pi / 2;
-        final midAngle = (prevAngle + angle) / 2;
-        final ctrlRx = isTip ? rx * 0.88 : rx * 0.85;
-        final ctrlRy = isTip ? ry * 0.82 : ry * 0.80;
-        rosettePath.quadraticBezierTo(
-          cx + ctrlRx * math.cos(midAngle),
-          cy + ctrlRy * math.sin(midAngle),
-          px,
-          py,
-        );
+        rosettePath.moveTo(sx, sy);
       }
+      rosettePath.quadraticBezierTo(ctrlX, ctrlY, ex, ey);
     }
     rosettePath.close();
 
-    // Soft tinted fill on the outer ornamental band
+    // Soft radial illuminated fill inside the scalloped rosette
+    final outerRect = Rect.fromCenter(
+      center: Offset(cx, cy),
+      width: size.width,
+      height: size.height,
+    );
     canvas.drawPath(
       rosettePath,
       Paint()
-        ..color = secondaryColor.withValues(
-          alpha: isSelected ? 0.30 : (isDark ? 0.22 : 0.16),
-        )
+        ..shader = RadialGradient(
+          colors: [
+            primaryColor.withValues(
+              alpha: isSelected ? 0.24 : (isDark ? 0.14 : 0.06),
+            ),
+            secondaryColor.withValues(
+              alpha: isSelected ? 0.36 : (isDark ? 0.26 : 0.22),
+            ),
+          ],
+          stops: const [0.45, 1.0],
+        ).createShader(outerRect)
         ..style = PaintingStyle.fill,
     );
 
-    // Scalloped outer ornament stroke in accent color
+    // Fine scalloped lace border in theme accent color
     canvas.drawPath(
       rosettePath,
       Paint()
-        ..color = primaryColor.withValues(alpha: 0.92)
+        ..color = primaryColor.withValues(alpha: 0.90)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = (minDim * 0.044).clamp(0.8, 1.7)
+        ..strokeWidth = (minDim * 0.036).clamp(0.75, 1.5)
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // 2. Inner medallion circle fill & crisp accent ring
+    // 2. Delicate pearl/bead dots nestled inside each of the 12 lotus petals
+    final pearlRadius = (minDim * 0.025).clamp(0.55, 1.15);
+    final pearlPaint = Paint()
+      ..color = primaryColor.withValues(alpha: 0.85)
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < petals; i++) {
+      final aMid = ((i + 0.5) * 2 * math.pi) / petals - math.pi / 2;
+      final px = cx + (rx * 0.77) * math.cos(aMid);
+      final py = cy + (ry * 0.69) * math.sin(aMid);
+      canvas.drawCircle(Offset(px, py), pearlRadius, pearlPaint);
+    }
+
+    // 3. Double-ringed inner medallion framing the Eastern Arabic Ayah number
     final innerRect = Rect.fromCenter(
       center: Offset(cx, cy),
       width: innerRx * 2,
@@ -2019,52 +2398,86 @@ class _AyahOrnamentPainter extends CustomPainter {
       innerRect,
       Paint()
         ..color = primaryColor.withValues(
-          alpha: isSelected ? 0.24 : (isDark ? 0.14 : 0.08),
+          alpha: isSelected ? 0.20 : (isDark ? 0.12 : 0.05),
         )
         ..style = PaintingStyle.fill,
     );
+    // Primary inner ring
     canvas.drawOval(
       innerRect,
       Paint()
         ..color = primaryColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = (minDim * 0.056).clamp(1.0, 2.1),
+        ..strokeWidth = (minDim * 0.048).clamp(0.95, 1.9),
+    );
+    // Delicate secondary concentric inner hairline ring
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx, cy),
+        width: innerRx * 1.78,
+        height: innerRy * 1.78,
+      ),
+      Paint()
+        ..color = secondaryColor.withValues(alpha: isDark ? 0.65 : 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (minDim * 0.022).clamp(0.5, 0.9),
     );
 
-    // 3. Classical Mushaf top & bottom crown finials (12 & 6 o'clock)
-    final finialPaint = Paint()
+    // 4. Graceful classical Madinah Mushaf teardrop crown finials (12 & 6 o'clock)
+    final finialFill = Paint()
       ..color = primaryColor
       ..style = PaintingStyle.fill;
-    final finialHalfW = (minDim * 0.095).clamp(1.3, 3.0);
     final finialTipY = ry * 0.99;
-    final finialBaseY = ry * 0.84;
+    final finialNeckY = ry * 0.76;
+    final finialBulgeX = rx * 0.13;
 
-    final topFinial = Path()
+    final topCrown = Path()
       ..moveTo(cx, cy - finialTipY)
-      ..lineTo(cx + finialHalfW, cy - finialBaseY)
-      ..lineTo(cx, cy - finialBaseY + finialHalfW * 0.45)
-      ..lineTo(cx - finialHalfW, cy - finialBaseY)
+      ..quadraticBezierTo(
+        cx + finialBulgeX,
+        cy - ry * 0.86,
+        cx + finialBulgeX * 0.55,
+        cy - finialNeckY,
+      )
+      ..lineTo(cx - finialBulgeX * 0.55, cy - finialNeckY)
+      ..quadraticBezierTo(
+        cx - finialBulgeX,
+        cy - ry * 0.86,
+        cx,
+        cy - finialTipY,
+      )
       ..close();
-    canvas.drawPath(topFinial, finialPaint);
+    canvas.drawPath(topCrown, finialFill);
 
-    final bottomFinial = Path()
+    final bottomCrown = Path()
       ..moveTo(cx, cy + finialTipY)
-      ..lineTo(cx + finialHalfW, cy + finialBaseY)
-      ..lineTo(cx, cy + finialBaseY - finialHalfW * 0.45)
-      ..lineTo(cx - finialHalfW, cy + finialBaseY)
+      ..quadraticBezierTo(
+        cx + finialBulgeX,
+        cy + ry * 0.86,
+        cx + finialBulgeX * 0.55,
+        cy + finialNeckY,
+      )
+      ..lineTo(cx - finialBulgeX * 0.55, cy + finialNeckY)
+      ..quadraticBezierTo(
+        cx - finialBulgeX,
+        cy + ry * 0.86,
+        cx,
+        cy + finialTipY,
+      )
       ..close();
-    canvas.drawPath(bottomFinial, finialPaint);
+    canvas.drawPath(bottomCrown, finialFill);
 
-    // 4. Delicate accent dots at the 4 diagonal axes (45°, 135°, 225°, 315°)
-    final dotRadius = (minDim * 0.036).clamp(0.7, 1.4);
-    final dotPaint = Paint()
-      ..color = primaryColor.withValues(alpha: 0.90)
-      ..style = PaintingStyle.fill;
-    for (int i = 0; i < 4; i++) {
-      final angle = (math.pi / 4) + (i * math.pi / 2);
-      final dx = cx + rx * 0.92 * math.cos(angle);
-      final dy = cy + ry * 0.86 * math.sin(angle);
-      canvas.drawCircle(Offset(dx, dy), dotRadius, dotPaint);
+    // 5. Subtle side flourish buds at 3 & 9 o'clock
+    final sideHalf = (minDim * 0.055).clamp(1.0, 2.2);
+    for (final sign in const [-1.0, 1.0]) {
+      final sx = cx + sign * (rx * 0.95);
+      final bud = Path()
+        ..moveTo(sx + sign * sideHalf * 0.75, cy)
+        ..lineTo(sx - sign * sideHalf * 0.4, cy - sideHalf * 0.65)
+        ..lineTo(sx - sign * sideHalf * 0.9, cy)
+        ..lineTo(sx - sign * sideHalf * 0.4, cy + sideHalf * 0.65)
+        ..close();
+      canvas.drawPath(bud, finialFill);
     }
   }
 

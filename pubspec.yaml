@@ -1,7 +1,7 @@
 name: mushaf_app
 description: "Version 1.0 MVP Madinah Mushaf (15-line QPC V1) for iOS and Android."
 publish_to: 'none'
-version: 1.0.1+5
+version: 1.0.1+6
 
 environment:
   sdk: ^3.11.4
@@ -31,7 +31,7 @@ flutter:
     - assets/mushaf.db
     - assets/images/
     - assets/fonts/
-    - assets/fonts/qpc/
+    - assets/fonts/qcf4/
 
   fonts:
     - family: QPC1BSML

@@ -173,6 +173,10 @@ class MushafController extends ChangeNotifier {
   static const String _prefScrollMode = 'mushaf_scroll_mode';
   static const String _prefSnapHaptic = 'mushaf_snap_haptic';
   static const String _prefAllowLandscape = 'mushaf_allow_landscape';
+  static const String _prefBoldQuranFont = 'mushaf_bold_quran_font';
+  static const String _prefShowPageBorder = 'mushaf_show_page_border';
+  static const String _prefHasCompletedOnboarding =
+      'mushaf_has_completed_onboarding';
 
   /// Selectable highlight colors for saved (bookmarked) ayahs.
   static const List<({Color color, String ar, String en})>
@@ -214,6 +218,9 @@ class MushafController extends ChangeNotifier {
   MushafScrollMode _scrollMode = MushafScrollMode.sideFlip;
   bool _snapHapticEnabled = true;
   bool _allowLandscape = true;
+  bool _boldQuranFont = false;
+  bool _showPageBorder = false;
+  bool _hasCompletedOnboarding = false;
   DateTime? _lastSnapHapticAt;
 
   /// Registered by the reader screen while the continuous vertical-scroll
@@ -233,6 +240,9 @@ class MushafController extends ChangeNotifier {
   MushafThemeData get theme => MushafThemeData.fromType(_themeType);
   MushafFontScaleMode get fontScaleMode => _fontScaleMode;
   bool get keepScreenAwake => _keepScreenAwake;
+  bool get boldQuranFont => _boldQuranFont;
+  bool get showPageBorder => _showPageBorder;
+  bool get hasCompletedOnboarding => _hasCompletedOnboarding;
 
   /// Always enabled (shown on Page 604 only when an active Khatma exists).
   bool get showLastPageKhatmaButton => true;
@@ -398,6 +408,10 @@ class MushafController extends ChangeNotifier {
     }
     _allowLandscape = _prefs?.getBool(_prefAllowLandscape) ?? true;
     _snapHapticEnabled = _prefs?.getBool(_prefSnapHaptic) ?? true;
+    _boldQuranFont = _prefs?.getBool(_prefBoldQuranFont) ?? false;
+    _showPageBorder = _prefs?.getBool(_prefShowPageBorder) ?? false;
+    _hasCompletedOnboarding =
+        _prefs?.getBool(_prefHasCompletedOnboarding) ?? false;
     _pageController = PageController(initialPage: _currentPage - 1);
 
     await _applyWakelock(_keepScreenAwake);
@@ -495,6 +509,27 @@ class MushafController extends ChangeNotifier {
     _allowLandscape = value;
     _prefs?.setBool(_prefAllowLandscape, value);
     unawaited(_applyOrientations(value));
+    notifyListeners();
+  }
+
+  void setBoldQuranFont(bool value) {
+    if (_boldQuranFont == value) return;
+    _boldQuranFont = value;
+    _prefs?.setBool(_prefBoldQuranFont, value);
+    notifyListeners();
+  }
+
+  void setShowPageBorder(bool value) {
+    if (_showPageBorder == value) return;
+    _showPageBorder = value;
+    _prefs?.setBool(_prefShowPageBorder, value);
+    notifyListeners();
+  }
+
+  void markOnboardingCompleted() {
+    if (_hasCompletedOnboarding) return;
+    _hasCompletedOnboarding = true;
+    _prefs?.setBool(_prefHasCompletedOnboarding, true);
     notifyListeners();
   }
 

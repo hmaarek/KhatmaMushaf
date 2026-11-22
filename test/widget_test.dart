@@ -11,19 +11,10 @@ void main() {
     expect(ArabicUtils.toArabicDigits(604), '٦٠٤');
 
     const uthmani = 'ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ';
-    expect(
-      ArabicUtils.normalizeForSearch(uthmani),
-      'الحمد لله رب العلمين',
-    );
+    expect(ArabicUtils.normalizeForSearch(uthmani), 'الحمد لله رب العلمين');
 
-    expect(
-      QpcFontLoaderService.fontFamilyForPage(1),
-      'QPC1_p001',
-    );
-    expect(
-      QpcFontLoaderService.fontFamilyForPage(604),
-      'QPC1_p604',
-    );
+    expect(QpcFontLoaderService.fontFamilyForPage(1), 'QCF4_Hafs_01');
+    expect(QpcFontLoaderService.fontFamilyForPage(604), 'QCF4_Hafs_47');
   });
 
   test('MushafThemeData provides all 3 reading themes', () {
@@ -37,12 +28,16 @@ void main() {
       'Crisp White',
     );
     expect(
-      MushafThemeData.fromType(MushafThemeType.amoledDark).pageBackground.toARGB32(),
+      MushafThemeData.fromType(
+        MushafThemeType.amoledDark,
+      ).pageBackground.toARGB32(),
       0xFF000000,
     );
   });
 
-  testWidgets('MushafApp renders loading state cleanly', (WidgetTester tester) async {
+  testWidgets('MushafApp renders loading state cleanly', (
+    WidgetTester tester,
+  ) async {
     final controller = MushafController();
     await tester.pumpWidget(MushafApp(controller: controller));
     expect(find.text('جاري فتح المصحف الشريف...'), findsOneWidget);

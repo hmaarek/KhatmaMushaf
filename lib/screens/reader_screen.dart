@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../l10n/l10n.dart';
 import '../models/mushaf_models.dart';
+import '../services/quran_audio_service.dart';
 import '../state/mushaf_controller.dart';
 import '../widgets/mushaf_page_widget.dart';
 import '../widgets/reader_hud_overlay.dart';
@@ -12,6 +13,7 @@ import 'ayah_explanation_sheet.dart';
 import 'bookmarks_sheet.dart';
 import 'index_sheet.dart';
 import 'khatma_sheet.dart';
+import 'onboarding_screen.dart';
 import 'search_sheet.dart';
 import 'settings_sheet.dart';
 import 'share_ayah_sheet.dart';
@@ -40,6 +42,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (!mounted) return;
     if (!widget.controller.languageChosen) {
       await _showLanguageChoiceDialog();
+      if (!mounted) return;
+    }
+    if (!widget.controller.hasCompletedOnboarding) {
+      await showOnboardingIntro(context, controller: widget.controller);
       if (!mounted) return;
     }
     setState(() {
@@ -509,6 +515,146 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  Future<void> _showQuickReciterPicker(
+    BuildContext context, {
+    int? replaySurahId,
+    int? replayAyahNumber,
+    bool keepActiveWord = false,
+  }) async {
+    final theme = widget.controller.theme;
+    final selected = await showModalBottomSheet<QuranReciter>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final current = widget.controller.selectedReciter;
+        return Directionality(
+          textDirection: L10n.dir,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            decoration: BoxDecoration(
+              color: theme.pageBackground,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              border: Border.all(color: theme.pageOuterBorder, width: 1.5),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.secondaryTextColor.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.headphones_rounded,
+                        color: theme.ornamentPrimary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        tr(
+                          'اختر قارئ تلاوة الآية',
+                          'Select Ayah Reciter',
+                          'آیت کے قاری کا انتخاب کریں',
+                        ),
+                        style: TextStyle(
+                          color: theme.glyphColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  for (final reciter in QuranReciter.values) ...[
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => Navigator.of(sheetCtx).pop(reciter),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          color: reciter == current
+                              ? theme.ornamentPrimary.withValues(alpha: 0.14)
+                              : theme.ornamentFill,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: reciter == current
+                                ? theme.ornamentPrimary
+                                : theme.pageInnerBorder,
+                            width: reciter == current ? 1.6 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              reciter == current
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_off_rounded,
+                              size: 20,
+                              color: reciter == current
+                                  ? theme.ornamentPrimary
+                                  : theme.secondaryTextColor,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                reciter.displayName,
+                                style: TextStyle(
+                                  color: theme.glyphColor,
+                                  fontSize: 14,
+                                  fontWeight: reciter == current
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (reciter != QuranReciter.values.last)
+                      const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null || selected == widget.controller.selectedReciter) {
+      return;
+    }
+    widget.controller.setSelectedReciter(selected);
+    if (replaySurahId != null &&
+        replayAyahNumber != null &&
+        widget.controller.audioService.isPlayingAyah) {
+      unawaited(
+        widget.controller.playAyahAudio(
+          replaySurahId,
+          replayAyahNumber,
+          keepActiveWord: keepActiveWord,
+        ),
+      );
+    }
+  }
+
   Widget _buildFloatingPronunciationBar(BuildContext context) {
     final theme = widget.controller.theme;
     final audio = widget.controller.audioService;
@@ -611,26 +757,46 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               const SizedBox(width: 4),
                             ],
                             Flexible(
-                              child: Text(
-                                audio.statusMessage ??
-                                    (activeWord != null
-                                        ? tr(
-                                            tr(
-                                              'اضغط لإعادة نطق الكلمة أو سماع الآية كاملة',
-                                              'Tap to replay word or listen to full ayah',
-                                            ),
-                                            'Tap to replay the word or hear the full ayah',
-                                          )
-                                        : tr(
-                                            'القارئ: ${widget.controller.selectedReciter.shortDisplayName}',
-                                            'Reciter: ${widget.controller.selectedReciter.shortDisplayName}',
-                                          )),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: theme.secondaryTextColor,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => _showQuickReciterPicker(
+                                  context,
+                                  replaySurahId: surahId,
+                                  replayAyahNumber: ayahNum,
+                                  keepActiveWord: activeWord != null,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 2,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          audio.statusMessage ??
+                                              tr(
+                                                'القارئ: ${widget.controller.selectedReciter.shortDisplayName}',
+                                                'Reciter: ${widget.controller.selectedReciter.shortDisplayName}',
+                                                'قاری: ${widget.controller.selectedReciter.shortDisplayName}',
+                                              ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: theme.secondaryTextColor,
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Icon(
+                                        Icons.arrow_drop_down_rounded,
+                                        size: 16,
+                                        color: theme.ornamentPrimary,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -1351,6 +1517,89 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Quick Reciter Switcher right inside the Full Ayah menu
+                            InkWell(
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: () => _showQuickReciterPicker(
+                                sheetCtx,
+                                replaySurahId: ayah.surahId,
+                                replayAyahNumber: ayah.ayahNumber,
+                                keepActiveWord: tappedWord != null,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.pageBackground.withValues(
+                                    alpha: 0.72,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: theme.pageInnerBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.headphones_rounded,
+                                      size: 17,
+                                      color: theme.ornamentPrimary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        tr(
+                                          'القارئ: ${widget.controller.selectedReciter.shortDisplayName}',
+                                          'Reciter: ${widget.controller.selectedReciter.shortDisplayName}',
+                                          'قاری: ${widget.controller.selectedReciter.shortDisplayName}',
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: theme.glyphColor,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme.ornamentPrimary.withValues(
+                                          alpha: 0.14,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            tr('تغيير', 'Change', 'تبدیل'),
+                                            style: TextStyle(
+                                              color: theme.ornamentPrimary,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.keyboard_arrow_down_rounded,
+                                            size: 16,
+                                            color: theme.ornamentPrimary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 8),
                             InkWell(

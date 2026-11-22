@@ -1,13 +1,15 @@
 import 'package:flutter/services.dart';
 
-/// Dynamically loads King Fahd Complex (QPC V1) page-specific glyph fonts
-/// (`assets/fonts/qpc/p001.ttf` .. `p604.ttf`) on demand via [FontLoader]
-/// so startup time is instant and memory usage remains low.
+import 'qcf4_page_metrics.dart';
+
+/// Dynamically loads King Fahd Complex QCF4 (1441H Madinah Mushaf) glyph fonts
+/// (`assets/fonts/qcf4/QCF4_Hafs_01_W.ttf` .. `QCF4_Hafs_47_W.ttf`) on demand
+/// via [FontLoader] so startup time is instant and memory usage remains low.
 class QpcFontLoaderService {
   QpcFontLoaderService._();
   static final QpcFontLoaderService instance = QpcFontLoaderService._();
 
-  final Set<int> _loadedPages = <int>{};
+  final Set<int> _loadedFontIndices = <int>{};
   final Map<int, Future<void>> _inFlightLoads = <int, Future<void>>{};
   bool _indoPakLoaded = false;
   Future<void>? _indoPakInFlight;
@@ -35,46 +37,48 @@ class QpcFontLoaderService {
 
   /// Returns the registered Flutter font family name for [pageNumber] (1..604).
   static String fontFamilyForPage(int pageNumber) {
-    final padded = pageNumber.clamp(1, 604).toString().padLeft(3, '0');
-    return 'QPC1_p$padded';
+    final idx = qcf4FontIndexForPage(pageNumber);
+    final padded = idx.toString().padLeft(2, '0');
+    return 'QCF4_Hafs_$padded';
   }
 
-  /// Returns true if the QPC V1 font for [pageNumber] is already registered.
-  bool isPageFontLoaded(int pageNumber) => _loadedPages.contains(pageNumber);
+  /// Returns true if the QCF4 font chunk for [pageNumber] is already registered.
+  bool isPageFontLoaded(int pageNumber) =>
+      _loadedFontIndices.contains(qcf4FontIndexForPage(pageNumber));
 
-  /// Dynamically loads the TTF font for [pageNumber] if not already loaded.
+  /// Dynamically loads the QCF4 TTF font chunk for [pageNumber] if not already loaded.
   Future<void> ensurePageFontLoaded(int pageNumber) {
-    final clamped = pageNumber.clamp(1, 604);
-    if (_loadedPages.contains(clamped)) {
+    final fontIdx = qcf4FontIndexForPage(pageNumber);
+    if (_loadedFontIndices.contains(fontIdx)) {
       return Future<void>.value();
     }
-    final existing = _inFlightLoads[clamped];
+    final existing = _inFlightLoads[fontIdx];
     if (existing != null) {
       return existing;
     }
 
-    final future = _loadFontInternal(clamped);
-    _inFlightLoads[clamped] = future;
+    final future = _loadFontChunkInternal(fontIdx);
+    _inFlightLoads[fontIdx] = future;
     return future;
   }
 
-  Future<void> _loadFontInternal(int pageNumber) async {
+  Future<void> _loadFontChunkInternal(int fontIdx) async {
     try {
-      final padded = pageNumber.toString().padLeft(3, '0');
-      final familyName = fontFamilyForPage(pageNumber);
-      final assetPath = 'assets/fonts/qpc/p$padded.ttf';
+      final padded = fontIdx.toString().padLeft(2, '0');
+      final familyName = 'QCF4_Hafs_$padded';
+      final assetPath = 'assets/fonts/qcf4/QCF4_Hafs_${padded}_W.ttf';
 
       final loader = FontLoader(familyName);
       loader.addFont(rootBundle.load(assetPath));
       await loader.load();
 
-      _loadedPages.add(pageNumber);
+      _loadedFontIndices.add(fontIdx);
     } finally {
-      _inFlightLoads.remove(pageNumber);
+      _inFlightLoads.remove(fontIdx);
     }
   }
 
-  /// Preloads the font for [centerPage] and its immediate neighbors (+/- [radius]).
+  /// Preloads the font chunk for [centerPage] and its immediate neighbors (+/- [radius]).
   Future<void> preloadWindow(int centerPage, {int radius = 2}) async {
     await Future.wait([
       ensureIndoPakFontLoaded(),
@@ -84,10 +88,10 @@ class QpcFontLoaderService {
     for (int offset = 1; offset <= radius; offset++) {
       final next = centerPage + offset;
       final prev = centerPage - offset;
-      if (next <= 604 && !_loadedPages.contains(next)) {
+      if (next <= 604 && !isPageFontLoaded(next)) {
         futures.add(ensurePageFontLoaded(next));
       }
-      if (prev >= 1 && !_loadedPages.contains(prev)) {
+      if (prev >= 1 && !isPageFontLoaded(prev)) {
         futures.add(ensurePageFontLoaded(prev));
       }
     }

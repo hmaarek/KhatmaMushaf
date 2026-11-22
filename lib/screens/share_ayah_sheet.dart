@@ -1411,47 +1411,67 @@ class _DecoratedAyahShareCard extends StatelessWidget {
         ? 19.5
         : 17.5;
 
+    final bool allUseQcf4 =
+        !isIndoPak &&
+        ayahs.every(
+          (a) =>
+              QpcFontLoaderService.instance.isPageFontLoaded(a.pageNumber) &&
+              a.qpcV1Glyphs.trim().isNotEmpty,
+        );
+
+    final qcfGlyphWidgets = <Widget>[];
     final spans = <InlineSpan>[];
-    for (int i = 0; i < ayahs.length; i++) {
-      final a = ayahs[i];
-      if (isIndoPak) {
-        spans.add(
-          TextSpan(
-            text: '${a.textUthmani.trim()} ',
-            style: TextStyle(
-              fontFamily: 'IndoPak',
-              fontSize: fontSize,
-              height: 1.95,
-              color: theme.glyphColor,
-            ),
-          ),
-        );
-        spans.add(
-          TextSpan(
-            text: '﴿${ArabicUtils.toArabicDigits(a.ayahNumber)}﴾ ',
-            style: TextStyle(
-              fontFamily: 'IndoPak',
-              fontSize: fontSize * 0.90,
-              height: 1.95,
-              color: theme.ornamentPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        );
-      } else {
+
+    if (allUseQcf4) {
+      for (final a in ayahs) {
         final pageFont = QpcFontLoaderService.fontFamilyForPage(a.pageNumber);
-        final hasQpc =
-            QpcFontLoaderService.instance.isPageFontLoaded(a.pageNumber) &&
-            a.qpcV1Glyphs.trim().isNotEmpty;
-        if (hasQpc) {
+        final glyphs = a.qpcV1Glyphs.trim().runes.toList(growable: false);
+        for (int gIdx = 0; gIdx < glyphs.length; gIdx++) {
+          final isEndMarker = gIdx == glyphs.length - 1;
+          qcfGlyphWidgets.add(
+            RichText(
+              textDirection: TextDirection.ltr,
+              maxLines: 1,
+              softWrap: false,
+              text: TextSpan(
+                text: String.fromCharCode(glyphs[gIdx]),
+                style: TextStyle(
+                  fontFamily: pageFont,
+                  fontSize: fontSize * 1.12,
+                  fontWeight: FontWeight.w400,
+                  height: 1.75,
+                  leadingDistribution: TextLeadingDistribution.even,
+                  color: isEndMarker ? theme.ornamentPrimary : theme.glyphColor,
+                ),
+              ),
+            ),
+          );
+        }
+      }
+    } else {
+      for (int i = 0; i < ayahs.length; i++) {
+        final a = ayahs[i];
+        if (isIndoPak) {
           spans.add(
             TextSpan(
-              text: '${a.qpcV1Glyphs.trim()} ',
+              text: '${a.textUthmani.trim()} ',
               style: TextStyle(
-                fontFamily: pageFont,
-                fontSize: fontSize * 1.12,
-                height: 1.85,
+                fontFamily: 'IndoPak',
+                fontSize: fontSize,
+                height: 1.95,
                 color: theme.glyphColor,
+              ),
+            ),
+          );
+          spans.add(
+            TextSpan(
+              text: '﴿${ArabicUtils.toArabicDigits(a.ayahNumber)}﴾ ',
+              style: TextStyle(
+                fontFamily: 'IndoPak',
+                fontSize: fontSize * 0.90,
+                height: 1.95,
+                color: theme.ornamentPrimary,
+                fontWeight: FontWeight.w800,
               ),
             ),
           );
@@ -1552,11 +1572,21 @@ class _DecoratedAyahShareCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Directionality(
                 textDirection: TextDirection.rtl,
-                child: RichText(
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.center,
-                  text: TextSpan(children: spans),
-                ),
+                child: allUseQcf4
+                    ? Wrap(
+                        direction: Axis.horizontal,
+                        textDirection: TextDirection.rtl,
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 0.0,
+                        runSpacing: 2.0,
+                        children: qcfGlyphWidgets,
+                      )
+                    : RichText(
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.center,
+                        text: TextSpan(children: spans),
+                      ),
               ),
             ),
 

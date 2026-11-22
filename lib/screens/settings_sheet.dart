@@ -4,6 +4,7 @@ import '../l10n/l10n.dart';
 import '../services/quran_audio_service.dart';
 import '../state/mushaf_controller.dart';
 import '../theme/mushaf_theme.dart';
+import 'onboarding_screen.dart';
 
 class SettingsSheet extends StatelessWidget {
   final MushafController controller;
@@ -382,6 +383,95 @@ class SettingsSheet extends StatelessWidget {
                               ),
                             );
                           }),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.ornamentFill,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.pageInnerBorder),
+                            ),
+                            child: SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              activeThumbColor: theme.ornamentPrimary,
+                              secondary: Icon(
+                                Icons.format_bold_rounded,
+                                color: theme.ornamentPrimary,
+                              ),
+                              value: controller.boldQuranFont,
+                              onChanged: controller.setBoldQuranFont,
+                              title: Text(
+                                tr(
+                                  'خط المصحف عريض',
+                                  'Bold Mushaf font',
+                                  'مصحف کا موٹا خط',
+                                ),
+                                style: TextStyle(
+                                  color: theme.glyphColor,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                tr(
+                                  'جعل حروف المصحف أكثر سُمكاً ووضوحاً أثناء القراءة',
+                                  'Make Quranic calligraphy bolder for easier reading',
+                                  'آسان قراءت کے لیے قرآن کے حروف کو زیادہ موٹا اور واضح بنائیں',
+                                ),
+                                style: TextStyle(
+                                  color: theme.secondaryTextColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.ornamentFill,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.pageInnerBorder),
+                            ),
+                            child: SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              activeThumbColor: theme.ornamentPrimary,
+                              secondary: Icon(
+                                Icons.crop_portrait_rounded,
+                                color: theme.ornamentPrimary,
+                              ),
+                              value: controller.showPageBorder,
+                              onChanged: controller.setShowPageBorder,
+                              title: Text(
+                                tr(
+                                  'إطار رفيع حول الصفحة',
+                                  'Thin border around page',
+                                  'صفحے کے گرد باریک حاشیہ',
+                                ),
+                                style: TextStyle(
+                                  color: theme.glyphColor,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                tr(
+                                  'إظهار إطار مزخرف رفيع حول صفحات المصحف',
+                                  'Show a thin ornamental border around Mushaf pages',
+                                  'مصحف کے صفحات کے گرد باریک مزین حاشیہ دکھائیں',
+                                ),
+                                style: TextStyle(
+                                  color: theme.secondaryTextColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
 
                           const SizedBox(height: 14),
                           // Section 2: Reading Theme
@@ -952,6 +1042,48 @@ class SettingsSheet extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.secondaryTextColor,
+                              backgroundColor: theme.ornamentFill,
+                              side: BorderSide(
+                                color: theme.pageInnerBorder,
+                                width: 1.2,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              showOnboardingIntro(
+                                context,
+                                controller: controller,
+                              );
+                            },
+                            icon: Icon(
+                              Icons.auto_stories_rounded,
+                              size: 20,
+                              color: theme.ornamentPrimary,
+                            ),
+                            label: Text(
+                              tr(
+                                'عرض المقدمة التعريفية للتطبيق',
+                                'View App Welcome Introduction',
+                                'ایپ کا تعارفی پیغام دوبارہ دیکھیں',
+                              ),
+                              style: TextStyle(
+                                color: theme.glyphColor,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),

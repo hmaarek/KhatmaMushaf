@@ -22,6 +22,8 @@ class DatabaseService {
     return _db!;
   }
 
+  static const String _expectedLayoutVersion = 'qcf4_1441h_v1';
+
   Future<Database> _initDatabase() async {
     final dbFolder = await getDatabasesPath();
     final dbPath = p.join(dbFolder, 'mushaf_v1.db');
@@ -29,55 +31,124 @@ class DatabaseService {
     final exists = await databaseExists(dbPath);
     if (!exists) {
       await Directory(p.dirname(dbPath)).create(recursive: true);
-      final byteData = await rootBundle.load('assets/mushaf.db');
-      final bytes = byteData.buffer.asUint8List(
-        byteData.offsetInBytes,
-        byteData.lengthInBytes,
-      );
-      await File(dbPath).writeAsBytes(bytes, flush: true);
+      await _copyBundledDatabaseTo(dbPath);
     }
 
-    final db = await openDatabase(dbPath);
-    // Migrate existing installs to include `text_indopak` if missing
-    final cols = await db.rawQuery('PRAGMA table_info(ayahs)');
-    final hasIndopak = cols.any((c) => c['name'] == 'text_indopak');
-    if (!hasIndopak) {
-      await db.execute('ALTER TABLE ayahs ADD COLUMN text_indopak TEXT');
-      final tmpPath = p.join(dbFolder, 'mushaf_indopak_seed.db');
+    var db = await openDatabase(dbPath);
+
+    // Check if an existing installation needs the QCF4 (1441H) layout upgrade.
+    // Atomically builds the upgraded DB and preserves ALL user tables
+    // (bookmarks, khatmas, khatma_logs, tafsir_cache, word_gloss_cache).
+    if (!await _hasExpectedLayoutVersion(db)) {
+      final savedBookmarks = await _safeQueryAll(db, 'bookmarks');
+      final savedKhatmas = await _safeQueryAll(db, 'khatmas');
+      final savedKhatmaLogs = await _safeQueryAll(db, 'khatma_logs');
+      final savedTafsirCache = await _safeQueryAll(db, 'tafsir_cache');
+      final savedWordGlossCache = await _safeQueryAll(db, 'word_gloss_cache');
+      await db.close();
+
+      final tmpPath = p.join(dbFolder, 'mushaf_v1_migrating.db');
+      await _copyBundledDatabaseTo(tmpPath);
+      final migratedDb = await openDatabase(tmpPath);
       try {
-        final byteData = await rootBundle.load('assets/mushaf.db');
-        final bytes = byteData.buffer.asUint8List(
-          byteData.offsetInBytes,
-          byteData.lengthInBytes,
-        );
-        await File(tmpPath).writeAsBytes(bytes, flush: true);
-        final seedDb = await openReadOnlyDatabase(tmpPath);
-        final seedRows = await seedDb.query(
-          'ayahs',
-          columns: ['verse_key', 'text_indopak'],
-        );
-        await seedDb.close();
-        await db.transaction((txn) async {
+        await _ensureUserTables(migratedDb);
+        await migratedDb.transaction((txn) async {
           final batch = txn.batch();
-          for (final r in seedRows) {
-            batch.update(
-              'ayahs',
-              {'text_indopak': r['text_indopak']},
-              where: 'verse_key = ?',
-              whereArgs: [r['verse_key']],
+          for (final row in savedBookmarks) {
+            batch.insert(
+              'bookmarks',
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          for (final row in savedKhatmas) {
+            batch.insert(
+              'khatmas',
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          for (final row in savedKhatmaLogs) {
+            batch.insert(
+              'khatma_logs',
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          for (final row in savedTafsirCache) {
+            batch.insert(
+              'tafsir_cache',
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          for (final row in savedWordGlossCache) {
+            batch.insert(
+              'word_gloss_cache',
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
             );
           }
           await batch.commit(noResult: true);
         });
       } finally {
-        final f = File(tmpPath);
-        if (await f.exists()) {
-          await f.delete();
-        }
+        await migratedDb.close();
       }
+
+      // Clean up any stale SQLite WAL/SHM/journal sidecar files before swapping
+      for (final suffix in const ['-wal', '-shm', '-journal']) {
+        final oldSidecar = File('$dbPath$suffix');
+        if (await oldSidecar.exists()) await oldSidecar.delete();
+        final tmpSidecar = File('$tmpPath$suffix');
+        if (await tmpSidecar.exists()) await tmpSidecar.delete();
+      }
+
+      // Atomically swap migrated DB into place only after all user rows succeeded.
+      await File(tmpPath).rename(dbPath);
+      db = await openDatabase(dbPath);
+    } else {
+      await _ensureUserTables(db);
     }
 
-    // Ensure bookmarks table exists for user data persistence
+    return db;
+  }
+
+  Future<List<Map<String, Object?>>> _safeQueryAll(
+    Database db,
+    String table,
+  ) async {
+    try {
+      return await db.query(table);
+    } catch (_) {
+      return const <Map<String, Object?>>[];
+    }
+  }
+
+  Future<void> _copyBundledDatabaseTo(String dbPath) async {
+    final byteData = await rootBundle.load('assets/mushaf.db');
+    final bytes = byteData.buffer.asUint8List(
+      byteData.offsetInBytes,
+      byteData.lengthInBytes,
+    );
+    await File(dbPath).writeAsBytes(bytes, flush: true);
+  }
+
+  Future<bool> _hasExpectedLayoutVersion(Database db) async {
+    try {
+      final rows = await db.query(
+        'db_meta',
+        columns: ['value'],
+        where: 'key = ?',
+        whereArgs: ['layout_version'],
+        limit: 1,
+      );
+      return rows.isNotEmpty && rows.first['value'] == _expectedLayoutVersion;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _ensureUserTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS bookmarks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +162,52 @@ class DatabaseService {
         created_at TEXT NOT NULL
       )
     ''');
-    return db;
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS khatmas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        serial_number INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        metadata_json TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS khatma_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        khatma_id INTEGER NOT NULL,
+        ayah_global_id INTEGER NOT NULL,
+        surah_id INTEGER NOT NULL,
+        ayah_number INTEGER NOT NULL,
+        verse_key TEXT NOT NULL,
+        surah_name_arabic TEXT NOT NULL,
+        page_number INTEGER NOT NULL,
+        juz_number INTEGER NOT NULL,
+        recorded_at TEXT NOT NULL,
+        notes TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_khatma_logs_khatma
+      ON khatma_logs(khatma_id, id DESC)
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tafsir_cache (
+        source_id TEXT NOT NULL,
+        verse_key TEXT NOT NULL,
+        content TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (source_id, verse_key)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS word_gloss_cache (
+        verse_key TEXT NOT NULL PRIMARY KEY,
+        json_payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
   }
 
   /// Loads all 114 Surahs ordered by Surah ID.

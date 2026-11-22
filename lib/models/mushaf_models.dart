@@ -150,16 +150,25 @@ class LineWord {
     );
   }
 
-  static final RegExp _arabicDigitsOnlyRegex =
-      RegExp(r'^[\u0660-\u06690-9\s\u200f]+$');
-  static final RegExp _trailingArabicDigitsRegex =
-      RegExp(r'[\u0660-\u06690-9]+\s*$');
-  static final RegExp _stripNonWordMarksRegex =
-      RegExp(r'[\u0660-\u06690-9۞۩\u06D6-\u06ED\u200f]+');
+  static final RegExp _arabicDigitsOnlyRegex = RegExp(
+    r'^[\u0660-\u06690-9\s\u200f]+$',
+  );
+  static final RegExp _trailingArabicDigitsRegex = RegExp(
+    r'[\u0660-\u06690-9]+\s*$',
+  );
+  static final RegExp _stripNonWordMarksRegex = RegExp(
+    r'[\u0660-\u06690-9۞۩\u06D6-\u06ED\u200f]+',
+  );
 
   /// True when this entry represents only a standalone verse-end number marker (e.g. '٣٠').
   bool get isStandaloneVerseMarker =>
       _arabicDigitsOnlyRegex.hasMatch(wordUthmani.trim());
+
+  /// True when this entry is a standalone Rub' al-Hizb ('۞') or Sajdah ('۩') ornament mark.
+  bool get isOrnamentMark {
+    final t = wordUthmani.trim();
+    return t == '۞' || t == '۩';
+  }
 
   /// True when this word is followed by the ornamental verse-end number marker (e.g. 'ٱلرَّحِيمِ ١').
   bool get hasTrailingVerseMarker =>
@@ -188,8 +197,7 @@ class LineWord {
 
   /// Returns the clean vocalized Uthmani word without verse numbers or Hizb/Sajdah marks.
   String get cleanWordUthmani {
-    final cleaned =
-        wordUthmani.replaceAll(_stripNonWordMarksRegex, ' ').trim();
+    final cleaned = wordUthmani.replaceAll(_stripNonWordMarksRegex, ' ').trim();
     return cleaned.isEmpty ? wordUthmani.trim() : cleaned;
   }
 
@@ -236,10 +244,7 @@ class MushafPageData {
   final MushafPageInfo info;
   final List<MushafPageLine> lines;
 
-  const MushafPageData({
-    required this.info,
-    required this.lines,
-  });
+  const MushafPageData({required this.info, required this.lines});
 }
 
 class AyahRecord {
@@ -325,7 +330,8 @@ class BookmarkItem {
       verseKey: map['verse_key'] as String?,
       title: map['title'] as String,
       snippet: map['snippet'] as String?,
-      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(map['created_at'] as String? ?? '') ??
           DateTime.now(),
     );
   }

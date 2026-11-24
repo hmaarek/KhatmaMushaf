@@ -40,7 +40,8 @@ class KhatmaReminderReceiver : BroadcastReceiver() {
             @Suppress("DEPRECATION")
             android.app.Notification.Builder(context)
         }
-        builder.setSmallIcon(context.applicationInfo.icon)
+        builder.setSmallIcon(R.drawable.ic_stat_khatma)
+            .setColor(0xFF174D3C.toInt())
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(android.app.Notification.BigTextStyle().bigText(body))

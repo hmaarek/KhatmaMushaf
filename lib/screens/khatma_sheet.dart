@@ -574,28 +574,35 @@ class _KhatmaSheetState extends State<KhatmaSheet>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.auto_awesome_rounded,
-                          color: Color(0xFF2B8A62),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          tr(
-                            'الثواب التقديري (١٠ حسنات/حرف):',
-                            'Est. Thawab (10 Hasanat/letter):',
-                            'متوقع ثواب (١٠ نیکیاں فی حرف):',
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Color(0xFF2B8A62),
+                            size: 18,
                           ),
-                          style: TextStyle(
-                            color: theme.glyphColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              tr(
+                                'الثواب التقديري (١٠ حسنات/حرف):',
+                                'Est. Thawab (10/letter):',
+                                'متوقع ثواب (١٠ نیکیاں/حرف):',
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.glyphColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [

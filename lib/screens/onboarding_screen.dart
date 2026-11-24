@@ -24,18 +24,30 @@ Future<void> showOnboardingIntro(
 
 class OnboardingScreen extends StatefulWidget {
   final MushafController controller;
+  final int initialPage;
 
-  const OnboardingScreen({super.key, required this.controller});
+  const OnboardingScreen({
+    super.key,
+    required this.controller,
+    this.initialPage = 0,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final PageController _pageController = PageController();
-  int _currentIndex = 0;
+  late final PageController _pageController;
+  late int _currentIndex;
 
   static const int _totalPages = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialPage.clamp(0, _totalPages - 1);
+    _pageController = PageController(initialPage: _currentIndex);
+  }
 
   @override
   void dispose() {

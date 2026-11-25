@@ -414,27 +414,35 @@ class MushafController extends ChangeNotifier {
         _prefs?.getBool(_prefHasCompletedOnboarding) ?? false;
     _pageController = PageController(initialPage: _currentPage - 1);
 
-    await _applyWakelock(_keepScreenAwake);
-    await _applyOrientations(_allowLandscape);
+    unawaited(_applyWakelock(_keepScreenAwake));
+    unawaited(_applyOrientations(_allowLandscape));
 
-    // Load index tables, bookmarks, khatmas, letter counts, and initial page data + QPC font in parallel
-    final results = await Future.wait<Object?>([
-      _dbService.getAllSurahs(),
-      _dbService.getAllJuzs(),
-      _dbService.getBookmarks(),
-      _khatmaService.getAllKhatmas(),
-      _dbService.preloadPages(_currentPage, radius: 1),
-      _fontLoader.preloadWindow(_currentPage, radius: 1),
-      _dbService.ensureLetterCountsLoaded(),
-    ]);
+    try {
+      // Ensure the SQLite database is copied/migrated and opened strictly once
+      // before firing parallel startup queries.
+      await _dbService.database;
 
-    _surahs = results[0] as List<SurahInfo>;
-    _juzs = results[1] as List<JuzInfo>;
-    _updateBookmarksCache(results[2] as List<BookmarkItem>);
-    _khatmas = results[3] as List<KhatmaRecord>;
+      // Load index tables, bookmarks, khatmas, letter counts, and initial page data + QPC font in parallel
+      final results = await Future.wait<Object?>([
+        _dbService.getAllSurahs(),
+        _dbService.getAllJuzs(),
+        _dbService.getBookmarks(),
+        _khatmaService.getAllKhatmas(),
+        _dbService.preloadPages(_currentPage, radius: 1),
+        _fontLoader.preloadWindow(_currentPage, radius: 1),
+        _dbService.ensureLetterCountsLoaded(),
+      ]);
 
-    _isInitialized = true;
-    notifyListeners();
+      _surahs = results[0] as List<SurahInfo>;
+      _juzs = results[1] as List<JuzInfo>;
+      _updateBookmarksCache(results[2] as List<BookmarkItem>);
+      _khatmas = results[3] as List<KhatmaRecord>;
+    } catch (e) {
+      debugPrint('MushafController.initialize recovery: $e');
+    } finally {
+      _isInitialized = true;
+      notifyListeners();
+    }
 
     unawaited(MushafSystemService.instance.syncKhatmaReminder(activeKhatma));
 

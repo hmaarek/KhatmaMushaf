@@ -11,15 +11,21 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   Database? _db;
+  Future<Database>? _initFuture;
   final Map<int, MushafPageData> _pageCache = <int, MushafPageData>{};
   List<SurahInfo>? _surahsCache;
   List<JuzInfo>? _juzsCache;
   List<int>? _cumulativeLettersByAyah;
 
-  Future<Database> get database async {
-    if (_db != null) return _db!;
-    _db = await _initDatabase();
-    return _db!;
+  Future<Database> get database {
+    if (_db != null) return Future<Database>.value(_db!);
+    return _initFuture ??= _initDatabase().then((db) {
+      _db = db;
+      return db;
+    }).catchError((Object err) {
+      _initFuture = null;
+      throw err;
+    });
   }
 
   static const String _expectedLayoutVersion = 'qcf4_1441h_v1';
@@ -28,10 +34,12 @@ class DatabaseService {
     final dbFolder = await getDatabasesPath();
     final dbPath = p.join(dbFolder, 'mushaf_v1.db');
 
+    await Directory(p.dirname(dbPath)).create(recursive: true);
     final exists = await databaseExists(dbPath);
     if (!exists) {
-      await Directory(p.dirname(dbPath)).create(recursive: true);
-      await _copyBundledDatabaseTo(dbPath);
+      final initTmpPath = p.join(dbFolder, 'mushaf_v1_init.db');
+      await _copyBundledDatabaseTo(initTmpPath);
+      await File(initTmpPath).rename(dbPath);
     }
 
     var db = await openDatabase(dbPath);
@@ -103,14 +111,39 @@ class DatabaseService {
         if (await tmpSidecar.exists()) await tmpSidecar.delete();
       }
 
-      // Atomically swap migrated DB into place only after all user rows succeeded.
+    // Atomically swap migrated DB into place only after all user rows succeeded.
       await File(tmpPath).rename(dbPath);
       db = await openDatabase(dbPath);
     } else {
       await _ensureUserTables(db);
     }
 
+    // Self-healing sanity check: if a previous interrupted install ever left
+    // an incomplete pages table, rebuild cleanly from bundled assets.
+    if (!await _isCoreSchemaHealthy(db)) {
+      await db.close();
+      for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+        final f = File('$dbPath$suffix');
+        if (await f.exists()) await f.delete();
+      }
+      final repairTmpPath = p.join(dbFolder, 'mushaf_v1_repair.db');
+      await _copyBundledDatabaseTo(repairTmpPath);
+      await File(repairTmpPath).rename(dbPath);
+      db = await openDatabase(dbPath);
+      await _ensureUserTables(db);
+    }
+
     return db;
+  }
+
+  Future<bool> _isCoreSchemaHealthy(Database db) async {
+    try {
+      final rows = await db.rawQuery('SELECT COUNT(*) AS cnt FROM pages');
+      final cnt = (rows.first['cnt'] as int?) ?? 0;
+      return cnt == 604;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<List<Map<String, Object?>>> _safeQueryAll(
